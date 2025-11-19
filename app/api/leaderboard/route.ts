@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db';
+import { sql } from '@vercel/postgres';
 
 function getWeekRange(date: Date): { start: Date; end: Date } {
   const start = new Date(date);
@@ -22,19 +22,18 @@ export async function GET(request: Request) {
 
   const { start, end } = getWeekRange(targetDate);
 
-  const client = await db.connect();
   try {
-    const result = await client.query(`
+    const result = await sql`
       SELECT
         u.display_name,
         SUM(hrd.points) as total_score
       FROM heart_rate_data hrd
       JOIN users u ON hrd.user_id = u.id
-      WHERE hrd.timestamp >= $1 AND hrd.timestamp <= $2
+      WHERE hrd.timestamp >= ${start.toISOString()} AND hrd.timestamp <= ${end.toISOString()}
       GROUP BY u.display_name
       ORDER BY total_score DESC
       LIMIT 100;
-    `, [start.toISOString(), end.toISOString()]);
+    `;
 
     // Add rank
     const leaderboard = result.rows.map((row, index) => ({
@@ -56,7 +55,5 @@ export async function GET(request: Request) {
       { error: 'Failed to fetch leaderboard data.' },
       { status: 500 }
     );
-  } finally {
-    client.release();
   }
 }

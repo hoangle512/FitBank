@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db';
+import { sql } from '@vercel/postgres';
 import { calculatePointsForBpm } from '../../../lib/scoring';
 
 // Define the expected data structure
@@ -22,31 +22,24 @@ export async function POST(request: Request) {
 
     const points = calculatePointsForBpm(data.bpm); // Assumes default age
 
-    const client = await db.connect();
-    try {
-      // Find or create user
-      let userResult = await client.query('SELECT id FROM users WHERE id = $1', [data.deviceId]);
+    // Using a transaction to ensure both queries succeed or fail together
+    const result = await sql.transaction(async (sql) => {
+      const userResult = await sql`SELECT id FROM users WHERE id = ${data.deviceId}`;
       if (userResult.rowCount === 0) {
-        // For simplicity, using the deviceId as the initial display name
-        await client.query(
-          'INSERT INTO users (id, display_name) VALUES ($1, $2)',
-          [data.deviceId, data.deviceId]
-        );
+        await sql`INSERT INTO users (id, display_name) VALUES (${data.deviceId}, ${data.deviceId})`;
       }
+      await sql`
+        INSERT INTO heart_rate_data (user_id, bpm, timestamp, points)
+        VALUES (${data.deviceId}, ${data.bpm}, ${data.timestamp}, ${points})
+      `;
+      return true;
+    });
 
-      // Insert heart rate data
-      await client.query(
-        'INSERT INTO heart_rate_data (user_id, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
-        [data.deviceId, data.bpm, data.timestamp, points]
-      );
 
-      return NextResponse.json(
-        { message: 'Heart rate data saved successfully.' },
-        { status: 201 }
-      );
-    } finally {
-      client.release();
-    }
+    return NextResponse.json(
+      { message: 'Heart rate data saved successfully.' },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error processing heart rate data:', error);
     return NextResponse.json(
