@@ -1,11 +1,10 @@
 import { db } from '../lib/db';
-import { sql } from '@vercel/postgres';
 
 async function alterTables() {
   const client = await db.connect();
 
   try {
-    await client.query(sql`
+    await client.query(`
       ALTER TABLE heart_rate_data
       ADD COLUMN IF NOT EXISTS points INT DEFAULT 0;
     `);

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../lib/db';
-import { sql } from '@vercel/postgres';
 import { calculatePointsForBpm } from '../../../lib/scoring';
 
 // Define the expected data structure
@@ -26,20 +25,20 @@ export async function POST(request: Request) {
     const client = await db.connect();
     try {
       // Find or create user
-      let userResult = await client.query(sql`SELECT id FROM users WHERE id = ${data.deviceId}`);
+      let userResult = await client.query('SELECT id FROM users WHERE id = $1', [data.deviceId]);
       if (userResult.rowCount === 0) {
         // For simplicity, using the deviceId as the initial display name
-        await client.query(sql`
-          INSERT INTO users (id, display_name)
-          VALUES (${data.deviceId}, ${data.deviceId})
-        `);
+        await client.query(
+          'INSERT INTO users (id, display_name) VALUES ($1, $2)',
+          [data.deviceId, data.deviceId]
+        );
       }
 
       // Insert heart rate data
-      await client.query(sql`
-        INSERT INTO heart_rate_data (user_id, bpm, timestamp, points)
-        VALUES (${data.deviceId}, ${data.bpm}, ${data.timestamp}, ${points})
-      `);
+      await client.query(
+        'INSERT INTO heart_rate_data (user_id, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
+        [data.deviceId, data.bpm, data.timestamp, points]
+      );
 
       return NextResponse.json(
         { message: 'Heart rate data saved successfully.' },
