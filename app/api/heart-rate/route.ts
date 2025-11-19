@@ -1,38 +1,57 @@
 import { NextResponse } from 'next/server';
+import { db } from '../../../lib/db';
+import { sql } from '@vercel/postgres';
+import { calculatePointsForBpm } from '../../../lib/scoring';
 
-// Define the expected data structure (optional but good practice)
+// Define the expected data structure
 type HeartRateData = {
   bpm: number;
-  timestamp: string;
+  timestamp: string; // ISO 8601 format
   deviceId: string;
 };
 
 export async function POST(request: Request) {
   try {
-    // 1. Parse the incoming JSON body
     const data: HeartRateData = await request.json();
 
-    // 2. Validate the data (Basic check)
-    if (!data.bpm || !data.deviceId) {
+    if (!data.bpm || !data.deviceId || !data.timestamp) {
       return NextResponse.json(
-        { error: 'Missing required fields: bpm or deviceId' },
+        { error: 'Missing required fields: bpm, deviceId, or timestamp' },
         { status: 400 }
       );
     }
 
-    // 3. Log the data to Vercel Runtime Logs
-    // In a real app, you would save this to a database (like Vercel Postgres)
-    console.log(`[HEART_RATE_RECEIVED] Device: ${data.deviceId} | BPM: ${data.bpm} | Time: ${new Date().toISOString()}`);
+    const points = calculatePointsForBpm(data.bpm); // Assumes default age
 
-    // 4. Return success response
-    return NextResponse.json(
-      { message: 'Heart rate data received successfully', receivedData: data },
-      { status: 200 }
-    );
+    const client = await db.connect();
+    try {
+      // Find or create user
+      let userResult = await client.query(sql`SELECT id FROM users WHERE id = ${data.deviceId}`);
+      if (userResult.rowCount === 0) {
+        // For simplicity, using the deviceId as the initial display name
+        await client.query(sql`
+          INSERT INTO users (id, display_name)
+          VALUES (${data.deviceId}, ${data.deviceId})
+        `);
+      }
 
+      // Insert heart rate data
+      await client.query(sql`
+        INSERT INTO heart_rate_data (user_id, bpm, timestamp, points)
+        VALUES (${data.deviceId}, ${data.bpm}, ${data.timestamp}, ${points})
+      `);
+
+      return NextResponse.json(
+        { message: 'Heart rate data saved successfully.' },
+        { status: 201 }
+      );
+    } finally {
+      client.release();
+    }
   } catch (error) {
+    console.error('Error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to parse JSON body' },
+      { error: 'Failed to process request.' },
       { status: 500 }
     );
   }
