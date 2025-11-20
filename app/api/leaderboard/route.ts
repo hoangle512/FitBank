@@ -25,12 +25,11 @@ export async function GET(request: Request) {
   try {
     const result = await sql`
       SELECT
-        u.display_name,
+        hrd.username,
         SUM(hrd.points) as total_score
       FROM heart_rate_data hrd
-      JOIN users u ON hrd.user_id = u.id
       WHERE hrd.timestamp >= ${start.toISOString()} AND hrd.timestamp <= ${end.toISOString()}
-      GROUP BY u.display_name
+      GROUP BY hrd.username
       ORDER BY total_score DESC
       LIMIT 100;
     `;
@@ -38,7 +37,7 @@ export async function GET(request: Request) {
     // Add rank
     const leaderboard = result.rows.map((row, index) => ({
       rank: index + 1,
-      displayName: row.display_name,
+      displayName: row.username,
       score: Number(row.total_score),
     }));
 

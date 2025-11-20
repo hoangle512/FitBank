@@ -1,41 +1,38 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../lib/db';
 import { calculatePointsForBpm } from '../../../lib/scoring';
+import { z } from 'zod';
 
-// Define the expected data structure
-type HeartRateData = {
-  bpm: number;
-  timestamp: string; // ISO 8601 format
-  deviceId: string;
-};
+// Define the expected data structure using Zod
+const HeartRateDataSchema = z.object({
+  bpm: z.number().int().positive(),
+  timestamp: z.string().datetime(), // ISO 8601 format
+  username: z.string().min(1),
+});
 
 export async function POST(request: Request) {
   const client = await db.connect();
   try {
-    const data: HeartRateData = await request.json();
+    const json = await request.json();
+    const data = HeartRateDataSchema.safeParse(json);
 
-    if (!data.bpm || !data.deviceId || !data.timestamp) {
+    if (!data.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: bpm, deviceId, or timestamp' },
+        { error: 'Invalid request data', details: data.error.errors },
         { status: 400 }
       );
     }
 
-    const points = calculatePointsForBpm(data.bpm); // Assumes default age
+    const { bpm, username, timestamp } = data.data;
+
+    const points = calculatePointsForBpm(bpm); // Assumes default age
 
     await client.query('BEGIN');
 
-    // Find or create user
-    const userResult = await client.query('SELECT id FROM users WHERE id = $1', [data.deviceId]);
-    if (userResult.rowCount === 0) {
-      // For simplicity, using the deviceId as the initial display name
-      await client.query('INSERT INTO users (id, display_name) VALUES ($1, $1)', [data.deviceId]);
-    }
-
     // Insert heart rate data
     await client.query(
-      'INSERT INTO heart_rate_data (user_id, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
-      [data.deviceId, data.bpm, data.timestamp, points]
+      'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
+      [username, bpm, timestamp, points]
     );
 
     await client.query('COMMIT');

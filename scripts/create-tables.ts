@@ -12,7 +12,7 @@ async function createTables() {
     await sql`
       CREATE TABLE IF NOT EXISTS heart_rate_data (
         id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255) REFERENCES users(id),
+        username VARCHAR(255),
         bpm INT NOT NULL,
         timestamp TIMESTAMPTZ NOT NULL
       );
