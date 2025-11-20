@@ -5,32 +5,31 @@ import { z } from 'zod';
 
 // Define the expected data structure for a single heart rate entry using Zod
 const HeartRateDataSchema = z.object({
-  bpm: z.number().int().positive(),
+  bpm: z.number().int(),
   timestamp: z.string().datetime(), // ISO 8601 format
   username: z.string().min(1),
 });
 
-// Define the schema for an array of heart rate entries
-const HeartRateDataArraySchema = z.array(HeartRateDataSchema);
+const HeartRatePayloadSchema = z.object({
+  data: z.array(HeartRateDataSchema),
+});
 
 export async function POST(request: Request) {
   const client = await db.connect();
   try {
     const json = await request.json();
-    // Check if the incoming data is an array, if not, wrap it in an array
-    const dataArray = Array.isArray(json) ? json : [json];
-    const data = HeartRateDataArraySchema.safeParse(dataArray);
+    const parsedPayload = HeartRatePayloadSchema.safeParse(json);
 
-    if (!data.success) {
+    if (!parsedPayload.success) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: data.error.errors },
+        { error: 'Invalid request data', details: parsedPayload.error.errors },
         { status: 400 }
       );
     }
 
     await client.query('BEGIN');
 
-    for (const entry of data.data) {
+    for (const entry of parsedPayload.data.data) {
       const { bpm, username, timestamp } = entry;
       const points = calculatePointsForBpm(bpm); // Assumes default age
 

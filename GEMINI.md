@@ -1,85 +1,89 @@
-# Project Overview
+# Magentic-UI
 
-This is a Next.js project bootstrapped with `create-next-app`. It functions as a fitness tracking application, likely named "FitBank," focusing on heart rate data.
+This project provides a set of Python classes and functions to interact with Google's Gemini large language models. It includes features for making both synchronous and asynchronous calls, handling parallel requests, and converting between Gemini and JSON schemas.
 
-**Key Technologies:**
+## Key Technologies:
 
-*   **Framework:** Next.js (React)
-*   **Database:** PostgreSQL (managed with Vercel Postgres)
-*   **Styling:** Tailwind CSS
-*   **UI Components:** Radix UI
-*   **Form Management:** `react-hook-form`
-*   **Schema Validation:** `zod`
-*   **Analytics:** Vercel Analytics
-*   **Icons:** `lucide-react`
+*   **Language:** Python
+*   **Google AI Services:** Gemini API, Vertex AI
 
-The application includes API endpoints for heart rate data and a leaderboard, and it interacts with a PostgreSQL database to store user and heart rate information.
+## Features
 
-## Database Structure
+*   **`GeminiModel` Class**: A synchronous client for the Gemini API with features like:
+    *   Retry logic with exponential backoff.
+    *   Parallel execution of multiple prompts using a thread pool.
+    *   Caching of model responses.
+    *   Request distribution across multiple regions.
+*   **`Gemini` Class**: An asynchronous client that integrates with a larger LLM framework (inherits from `BaseLlm`). It supports:
+    *   Streaming responses.
+    *   Async generation of content.
+    *   Automatic detection of Vertex AI or Gemini API backend.
+    *   Bidi connections for live sessions.
+*   **Schema Conversion**: Utility functions to convert between Gemini's `Schema` object and standard JSON Schema.
+    *   `gemini_to_json_schema`
+    *   `_to_gemini_schema`
 
-The database consists of two tables: `users` and `heart_rate_data`.
+## Code Overview
 
-**`users` table:**
-*   `id`: `VARCHAR(255)` - Primary Key, unique identifier for the user.
-*   `display_name`: `VARCHAR(255)` - The name displayed for the user.
+### `GeminiModel`
 
-**`heart_rate_data` table:**
-*   `id`: `SERIAL` - Primary Key, auto-incrementing unique identifier for each heart rate entry.
-*   `username`: `VARCHAR(255)` - The user's identifier.
-*   `bpm`: `INT` - Beats Per Minute, the recorded heart rate value.
-*   `timestamp`: `TIMESTAMPTZ` - The timestamp when the heart rate data was recorded.
-*   `points`: `INT` - Points calculated from the heart rate.
+The `GeminiModel` class provides a simple interface for calling the Gemini models.
 
-## Building and Running
+```python
+class GeminiModel:
+    """Class for the Gemini model."""
 
-To get started with the project, follow these steps:
+    def __init__(
+        self,
+        model_name: str = "gemini-2.0-flash-001",
+        finetuned_model: bool = False,
+        distribute_requests: bool = False,
+        cache_name: str | None = None,
+        temperature: float = 0.01,
+        **kwargs,
+    ):
+        # ...
 
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
-    or
-    ```bash
-    yarn install
-    ```
-    or
-    ```bash
-    pnpm install
-    ```
-    or
-    ```bash
-    bun install
-    ```
+    @retry(max_attempts=12, base_delay=2, backoff_factor=2)
+    def call(self, prompt: str, parser_func=None) -> str:
+        # ...
 
-2.  **Set up Environment Variables:**
-    Ensure you have a `.env.local` file with the `POSTGRES_URL` environment variable configured for your PostgreSQL database connection.
+    def call_parallel(
+        self,
+        prompts: List[str],
+        parser_func: Optional[Callable[[str], str]] = None,
+        timeout: int = 60,
+        max_retries: int = 5,
+    ) -> List[Optional[str]]:
+        # ...
+```
 
-3.  **Run in Development Mode:**
-    ```bash
-    npm run dev
-    ```
-    This will start the development server. Open [http://localhost:3000](http://localhost:3000) in your browser to see the result.
+### `Gemini` (Async)
 
-4.  **Build for Production:**
-    ```bash
-    npm run build
-    ```
+The `Gemini` class is designed for asynchronous applications.
 
-5.  **Start Production Server:**
-    ```bash
-    npm run start
-    ```
+```python
+class Gemini(BaseLlm):
+  """Integration for Gemini models."""
 
-## Development Conventions
+  model: str = 'gemini-1.5-flash'
 
-*   **Code Linting:** ESLint is configured with Next.js recommended rules for React and TypeScript to maintain code quality.
-*   **TypeScript:** The project is written in TypeScript, ensuring type safety and improved developer experience.
-*   **Styling:** Tailwind CSS is used for efficient and consistent styling.
-*   **Path Aliases:** Path aliases are configured (e.g., `@/*` for the root directory) to simplify imports.
+  async def generate_content_async(
+      self, llm_request: LlmRequest, stream: bool = False
+  ) -> AsyncGenerator[LlmResponse, None]:
+      # ...
+```
 
-## Project Structure Highlights
+### Schema Conversion
 
-*   `app/`: Contains Next.js application routes, including API endpoints for `heart-rate` and `leaderboard`.
-*   `components/`: Reusable React components, including UI components (e.g., `avatar`, `badge`, `card`, `table`).
-*   `lib/`: Utility functions and database connection (`db.ts`, `scoring.ts`, `utils.ts`).
-*   `scripts/`: Database-related scripts like `create-tables.ts` and `alter-tables.ts`.
+The project includes functions to convert between Gemini and JSON schemas.
+
+```python
+def gemini_to_json_schema(gemini_schema: Schema) -> Dict[str, Any]:
+  """Converts a Gemini Schema object into a JSON Schema dictionary."""
+  # ...
+
+def _to_gemini_schema(openapi_schema: dict[str, Any]) -> Schema:
+  """Converts an OpenAPI schema dictionary to a Gemini Schema object."""
+  # ...
+```
