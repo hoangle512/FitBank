@@ -23,6 +23,9 @@ interface HeartRateEntry {
 export async function POST(request: Request) {
   const client = await db.connect();
   try {
+    let recordsProcessed = 0; // Declare recordsProcessed here
+    let existingEntriesCount = 0; // Declare for debugging
+    let newRecordsToInsertCount = 0; // Declare for debugging
     const json = await request.json();
     const parsedPayload = HeartRatePayloadSchema.safeParse(json);
 
@@ -34,6 +37,8 @@ export async function POST(request: Request) {
     }
 
     await client.query('BEGIN');
+    // Temporarily clear previous heart rate data for Shaq for a clean test run
+
 
     // Sort data by timestamp to ensure correct chronological processing
     const sortedData = parsedPayload.data.data.sort(
@@ -107,28 +112,62 @@ export async function POST(request: Request) {
       previousEntry = currentEntry;
     }
 
-    // Batch insert all generated data
+    // Batch insert all generated data, only new or newer entries
     if (recordsToInsert.length > 0) {
-      const insertPromises = recordsToInsert.map((entry) =>
-        client.query(
-          'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
-          [entry.username, entry.bpm, entry.timestamp, entry.points]
-        )
+      const uniqueUsernames = [...new Set(recordsToInsert.map(record => record.username))];
+
+      // Fetch the latest timestamp for each unique username from the database
+      const latestTimestampsResult = await client.query(
+        `SELECT username, MAX(timestamp) as latest_timestamp FROM heart_rate_data WHERE username = ANY($1::text[]) GROUP BY username`,
+        [uniqueUsernames]
       );
-      await Promise.all(insertPromises);
+
+      const latestTimestampMap = new Map<string, Date>();
+      latestTimestampsResult.rows.forEach(row => {
+        latestTimestampMap.set(row.username, new Date(row.latest_timestamp));
+      });
+      existingEntriesCount = latestTimestampsResult.rows.length; // For debugging, now counts users with existing entries
+
+      const newRecordsToInsert = recordsToInsert.filter(entry => {
+        const incomingTimestamp = new Date(entry.timestamp);
+        const latestDbTimestamp = latestTimestampMap.get(entry.username);
+
+        // If no entry exists for this username OR the incoming timestamp is newer than the latest in DB
+        return !latestDbTimestamp || incomingTimestamp.getTime() > latestDbTimestamp.getTime();
+      });
+      newRecordsToInsertCount = newRecordsToInsert.length; // For debugging
+
+      if (newRecordsToInsert.length > 0) {
+        const insertPromises = newRecordsToInsert.map((entry) =>
+          client.query(
+            'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
+            [entry.username, entry.bpm, entry.timestamp, entry.points]
+          )
+        );
+        await Promise.all(insertPromises);
+        recordsProcessed = newRecordsToInsert.length;
+      } else {
+        recordsProcessed = 0;
+      }
     }
 
     await client.query('COMMIT');
 
-    return NextResponse.json(
-      { message: 'Heart rate data saved successfully.', records_processed: recordsToInsert.length },
-      { status: 201 }
-    );
-  } catch (error) {
+          return NextResponse.json(
+            {
+              message: 'Heart rate data saved successfully.',
+              records_processed: recordsProcessed,
+              debug: {
+                existingEntriesCount: existingEntriesCount,
+                newRecordsToInsertCount: newRecordsToInsertCount,
+              }
+            },
+            { status: 201 }
+          );  } catch (error: any) {
     await client.query('ROLLBACK');
     console.error('Error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to process request.' },
+      { error: 'Failed to process request.', details: error.message },
       { status: 500 }
     );
   } finally {
