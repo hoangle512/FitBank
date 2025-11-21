@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
+    let previousEntry: HeartRateEntry | null = null;
     const recordsToInsert: {
       username: string;
       bpm: number;
@@ -48,14 +49,62 @@ export async function POST(request: Request) {
     }[] = [];
 
     for (const currentEntry of sortedData) {
-      const pointsToAssign = calculatePointsForBpm(currentEntry.bpm);
-
+              let pointsToAssign = 0;
+              const currentTimestamp = new Date(currentEntry.timestamp);
+      
+              if (previousEntry) {
+                  const previousTimestamp = new Date(previousEntry.timestamp);
+                  const timeDiffMilliseconds = currentTimestamp.getTime() - previousTimestamp.getTime();
+      
+                  // Always add points for the previous entry's BPM at its timestamp
+                  pointsToAssign += calculatePointsForBpm(previousEntry.bpm);
+      
+                  // Calculate interpolated BPM and add points for each full minute interval between entries
+                  let minuteIterator = new Date(previousTimestamp);
+                  minuteIterator.setSeconds(0, 0);
+                  minuteIterator.setMilliseconds(0);
+      
+                  // Move to the start of the next full minute after previousTimestamp
+                  // If previousTimestamp was 10:00:30, minuteIterator becomes 10:01:00
+                  // If previousTimestamp was 10:00:00, minuteIterator becomes 10:01:00
+                  minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+      
+                  const currentEntryMinuteStart = new Date(currentTimestamp);
+                  currentEntryMinuteStart.setSeconds(0, 0);
+                  currentEntryMinuteStart.setMilliseconds(0);
+      
+                  while (minuteIterator.getTime() < currentEntryMinuteStart.getTime()) {
+                      // Calculate interpolation factor at the start of this minute (minuteIterator)
+                      let interpolationFactor = 0;
+                      if (timeDiffMilliseconds > 0) {
+                          interpolationFactor = (minuteIterator.getTime() - previousTimestamp.getTime()) / timeDiffMilliseconds;
+                      }
+                      // Clamp factor to ensure it's between 0 and 1 (inclusive)
+                      interpolationFactor = Math.max(0, Math.min(1, interpolationFactor));
+      
+                      const interpolatedBpm = Math.round(
+                          previousEntry.bpm + interpolationFactor * (currentEntry.bpm - previousEntry.bpm)
+                      );
+                      pointsToAssign += calculatePointsForBpm(interpolatedBpm);
+      
+                      // Move to the next minute
+                      minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+                  }
+                  // Add points for the current entry's BPM
+                  pointsToAssign += calculatePointsForBpm(currentEntry.bpm);
+      
+              } else {
+                  // First entry, assign points for its BPM
+                  pointsToAssign = calculatePointsForBpm(currentEntry.bpm);
+              }
       recordsToInsert.push({
         username: currentEntry.username,
         bpm: currentEntry.bpm,
         timestamp: currentEntry.timestamp,
         points: pointsToAssign,
       });
+
+      previousEntry = currentEntry;
     }
 
     // Batch insert all generated data
