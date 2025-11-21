@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Trophy, TrendingUp, Medal, Crown } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -12,18 +13,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-// Mock data for weekly standings
-const weeklyStandings = [
-  { rank: 1, username: "ProGamer99", score: 2450, coins: 12, avatar: "/diverse-group-avatars.png" },
-  { rank: 2, username: "CompMaster", score: 2380, coins: 11, avatar: "/diverse-group-avatars.png" },
-  { rank: 3, username: "SkillzKing", score: 2290, coins: 10, avatar: "/diverse-group-avatars.png" },
-  { rank: 4, username: "ChampionX", score: 2180, coins: 9, avatar: "/diverse-group-avatars.png" },
-  { rank: 5, username: "VictoryLane", score: 2050, coins: 8, avatar: "/diverse-group-avatars.png" },
-  { rank: 6, username: "TopTier", score: 1980, coins: 8, avatar: "/diverse-group-avatars.png" },
-  { rank: 7, username: "ElitePlayer", score: 1890, coins: 7, avatar: "/diverse-group-avatars.png" },
-  { rank: 8, username: "RisingStar", score: 1820, coins: 7, avatar: "/diverse-group-avatars.png" },
-]
+import { getWeeklyStandings, type Standing } from "@/lib/actions"
 
 const getRankIcon = (rank: number) => {
   if (rank === 1) return <Crown className="size-5 text-accent" />
@@ -33,6 +23,19 @@ const getRankIcon = (rank: number) => {
 }
 
 export function CompetitionDashboard() {
+  const [standings, setStandings] = useState<Standing[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStandings = async () => {
+      setIsLoading(true)
+      const data = await getWeeklyStandings()
+      setStandings(data)
+      setIsLoading(false)
+    }
+    fetchStandings()
+  }, [])
+
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -86,27 +89,48 @@ export function CompetitionDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {weeklyStandings.map((player) => (
-                  <TableRow key={player.rank} className="group">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {getRankIcon(player.rank)}
-                        <span>{player.rank}</span>
-                      </div>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      Loading standings...
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="size-8">
-                          <AvatarImage src={player.avatar || "/placeholder.svg"} alt={player.username} />
-                          <AvatarFallback>{player.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{player.username}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">{player.score.toLocaleString()}</TableCell>
-                    <TableCell className="text-right hidden sm:table-cell">{player.coins}</TableCell>
                   </TableRow>
-                ))}
+                ) : standings.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No standings available for this week yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  standings.map((player) => (
+                    <TableRow key={player.rank} className="group">
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {getRankIcon(player.rank)}
+                          <span>{Number(player.rank)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="size-8">
+                            <AvatarImage
+                              src={player.avatar || "/placeholder.svg"}
+                              alt={player.username}
+                            />
+                            <AvatarFallback>{player.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{player.username}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {Number(player.score).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right hidden sm:table-cell">
+                        {Number(player.coins)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
