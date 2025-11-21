@@ -1,0 +1,104 @@
+{
+  "data": [
+    {
+      "bpm": 73,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T09:42:38Z"
+    },
+    {
+      "bpm": 77,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T09:47:38Z"
+    },
+    {
+      "bpm": 72,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T09:52:38Z"
+    },
+    {
+      "bpm": 74,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T09:57:38Z"
+    },
+    {
+      "bpm": 78,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:02:38Z"
+    },
+    {
+      "bpm": 73,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:07:38Z"
+    },
+    {
+      "bpm": 69,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:12:38Z"
+    },
+    {
+      "bpm": 73,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:17:38Z"
+    },
+    {
+      "bpm": 75,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:22:38Z"
+    },
+    {
+      "bpm": 78,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:27:38Z"
+    },
+    {
+      "bpm": 76,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:32:38Z"
+    },
+    {
+      "bpm": 80,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:37:38Z"
+    },
+    {
+      "bpm": 80,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:42:38Z"
+    },
+    {
+      "bpm": 83,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:47:38Z"
+    },
+    {
+      "bpm": 84,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:52:38Z"
+    },
+    {
+      "bpm": 79,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T10:57:38Z"
+    },
+    {
+      "bpm": 82,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T11:02:38Z"
+    },
+    {
+      "bpm": 80,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T11:07:38Z"
+    },
+    {
+      "bpm": 79,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T11:12:38Z"
+    },
+    {
+      "bpm": 82,
+      "user": "Shaq",
+      "timestamp": "2025-11-21T11:17:38Z"
+    }
+  ]
+}

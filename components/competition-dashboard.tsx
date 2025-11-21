@@ -141,35 +141,30 @@ export function CompetitionDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Competition Rules</CardTitle>
-          <CardDescription>How the weekly competition works</CardDescription>
+          <CardDescription>How the weekly competition works: You collect points for average heart rate bpm per minute. You have to achieve at least 500points weekly. If you dont, 1000CZK into the pot.</CardDescription>
         </CardHeader>
         <CardContent className="prose prose-sm dark:prose-invert max-w-none">
           <div className="space-y-4 text-sm leading-relaxed">
             <div>
               <h3 className="text-base font-semibold mb-2 text-foreground">Scoring System</h3>
               <ul className="space-y-1 text-muted-foreground">
-                <li>Win a match: <strong className="text-foreground">+200 points</strong></li>
-                <li>Runner-up: <strong className="text-foreground">+100 points</strong></li>
-                <li>Top 5 finish: <strong className="text-foreground">+50 points</strong></li>
-                <li>Participation: <strong className="text-foreground">+10 points</strong></li>
+                <li>&gt;125bpm: <strong className="text-foreground">+1 point</strong></li>
+                <li>&gt;150bpm: <strong className="text-foreground">+2 points</strong></li>
+                <li>&gt;165bpm: <strong className="text-foreground">+3 points</strong></li>
               </ul>
             </div>
             
             <div>
               <h3 className="text-base font-semibold mb-2 text-foreground">Coin Rewards</h3>
               <p className="text-muted-foreground">
-                Earn coins by completing matches and achieving high placements. Coins can be used for 
-                entry into premium tournaments, purchasing cosmetic items, or exchanged for bonus entries. 
-                Weekly coin bonuses are awarded to top 10 performers.
+                Earn coins by winning weekly competitions. Coins can be used to pay for your weekly losses.
               </p>
             </div>
 
             <div>
               <h3 className="text-base font-semibold mb-2 text-foreground">Prize Distribution</h3>
               <p className="text-muted-foreground">
-                Prizes are distributed every Monday at 12:00 UTC. Winners will be contacted via email 
-                within 48 hours. All prizes must be claimed within 30 days of notification. Tax documentation 
-                may be required for prizes exceeding $600 USD.
+               Prize pot will be put for a collective party at the end of the year.
               </p>
             </div>
 

@@ -39,8 +39,8 @@ export async function getWeeklyStandings(): Promise<Standing[]> {
     return (standingsData || []).map((row, index) => ({
       username: row.username,
       // Convert to Number to prevent BigInt serialization issues in Client Components
-      score: Number(row.score), 
-      coins: Number(row.coins),
+      score: Number(row.score) || 0, 
+      coins: Number(row.coins) || 0,
       avatar: row.avatar,
       rank: index + 1,
     }))
