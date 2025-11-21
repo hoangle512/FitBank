@@ -1,89 +1,53 @@
-# Magentic-UI
+# FitBank - Competition Dashboard
 
-This project provides a set of Python classes and functions to interact with Google's Gemini large language models. It includes features for making both synchronous and asynchronous calls, handling parallel requests, and converting between Gemini and JSON schemas.
+## Project Overview
 
-## Key Technologies:
+This is a Next.js application called "FitBank - Competition Dashboard" designed to track weekly fitness competitions and coin leaderboards. It leverages React 19, TypeScript, Tailwind CSS, and Radix UI for the frontend. The backend integrates with Supabase for server-side actions and uses a PostgreSQL database (via `@vercel/postgres`) to store and manage data. The application processes heart rate data, calculates scores based on BPM, and displays weekly standings.
 
-*   **Language:** Python
-*   **Google AI Services:** Gemini API, Vertex AI
+Key functionalities include:
+*   Processing incoming heart rate data (`bpm`, `timestamp`, `username`) via a Next.js API route.
+*   Calculating points based on heart rate BPM values using defined scoring logic (e.g., 125-149 BPM = 1 point, 150-164 BPM = 2 points, 165+ BPM = 3 points).
+*   Interpolating points for minute intervals between heart rate entries.
+*   Storing heart rate data and calculated points in a PostgreSQL database.
+*   Fetching and displaying weekly standings and leaderboards from the database.
+*   Utilizing Vercel Analytics for tracking.
 
-## Features
+## Building and Running
 
-*   **`GeminiModel` Class**: A synchronous client for the Gemini API with features like:
-    *   Retry logic with exponential backoff.
-    *   Parallel execution of multiple prompts using a thread pool.
-    *   Caching of model responses.
-    *   Request distribution across multiple regions.
-*   **`Gemini` Class**: An asynchronous client that integrates with a larger LLM framework (inherits from `BaseLlm`). It supports:
-    *   Streaming responses.
-    *   Async generation of content.
-    *   Automatic detection of Vertex AI or Gemini API backend.
-    *   Bidi connections for live sessions.
-*   **Schema Conversion**: Utility functions to convert between Gemini's `Schema` object and standard JSON Schema.
-    *   `gemini_to_json_schema`
-    *   `_to_gemini_schema`
+The project uses `npm` as its package manager. You can use `yarn`, `pnpm`, or `bun` as well.
 
-## Code Overview
+*   **Development Server:**
+    ```bash
+    npm run dev
+    ```
+    This will start the development server, usually accessible at [http://localhost:3000](http://localhost:3000).
 
-### `GeminiModel`
+*   **Build for Production:**
+    ```bash
+    npm run build
+    ```
+    This command compiles the application for production deployment.
 
-The `GeminiModel` class provides a simple interface for calling the Gemini models.
+*   **Start Production Server:**
+    ```bash
+    npm run start
+    ```
+    This command starts the Next.js production server.
 
-```python
-class GeminiModel:
-    """Class for the Gemini model."""
+*   **Linting:**
+    ```bash
+    npm run lint
+    ```
+    This command runs ESLint to check for code quality and style issues.
 
-    def __init__(
-        self,
-        model_name: str = "gemini-2.0-flash-001",
-        finetuned_model: bool = False,
-        distribute_requests: bool = False,
-        cache_name: str | None = None,
-        temperature: float = 0.01,
-        **kwargs,
-    ):
-        # ...
+## Development Conventions
 
-    @retry(max_attempts=12, base_delay=2, backoff_factor=2)
-    def call(self, prompt: str, parser_func=None) -> str:
-        # ...
-
-    def call_parallel(
-        self,
-        prompts: List[str],
-        parser_func: Optional[Callable[[str], str]] = None,
-        timeout: int = 60,
-        max_retries: int = 5,
-    ) -> List[Optional[str]]:
-        # ...
-```
-
-### `Gemini` (Async)
-
-The `Gemini` class is designed for asynchronous applications.
-
-```python
-class Gemini(BaseLlm):
-  """Integration for Gemini models."""
-
-  model: str = 'gemini-1.5-flash'
-
-  async def generate_content_async(
-      self, llm_request: LlmRequest, stream: bool = False
-  ) -> AsyncGenerator[LlmResponse, None]:
-      # ...
-```
-
-### Schema Conversion
-
-The project includes functions to convert between Gemini and JSON schemas.
-
-```python
-def gemini_to_json_schema(gemini_schema: Schema) -> Dict[str, Any]:
-  """Converts a Gemini Schema object into a JSON Schema dictionary."""
-  # ...
-
-def _to_gemini_schema(openapi_schema: dict[str, Any]) -> Schema:
-  """Converts an OpenAPI schema dictionary to a Gemini Schema object."""
-  # ...
-```
+*   **Framework:** Next.js (utilizing the App Router for routing and server components).
+*   **Language:** TypeScript.
+*   **Styling:** Tailwind CSS, with `clsx` and `tailwind-merge` utilities for combining class names.
+*   **Component Library:** Radix UI for accessible and customizable UI components.
+*   **Database:** PostgreSQL, accessed through `@vercel/postgres` and Supabase RPCs for specific data operations (e.g., `get_weekly_standings`).
+*   **Data Fetching/State Management:** Primarily relies on Next.js Server Components and Supabase for data fetching and management.
+*   **Form Handling:** `react-hook-form` is used for managing forms, coupled with `zod` for schema validation.
+*   **Analytics:** Integrated with Vercel Analytics.
+*   **Fonts:** Uses `Geist` fonts from `next/font/google`.

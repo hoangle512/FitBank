@@ -40,8 +40,40 @@ export async function POST(request: Request) {
     // Temporarily clear previous heart rate data for Shaq for a clean test run
 
 
+    // Fetch latest timestamps for all users in the payload
+    const allUsernames = [...new Set(parsedPayload.data.data.map(d => d.username))];
+    const latestTimestampsResult = await client.query(
+      `SELECT username, MAX(timestamp) as latest_timestamp FROM heart_rate_data WHERE username = ANY($1::text[]) GROUP BY username`,
+      [allUsernames]
+    );
+    const latestTimestampMap = new Map<string, Date>();
+    latestTimestampsResult.rows.forEach(row => {
+      latestTimestampMap.set(row.username, new Date(row.latest_timestamp));
+    });
+    existingEntriesCount = latestTimestampsResult.rows.length;
+
+    // Filter out data that is not newer than the latest recorded timestamp
+    const unsortedNewData = parsedPayload.data.data.filter(entry => {
+      const latestDbTimestamp = latestTimestampMap.get(entry.username);
+      if (!latestDbTimestamp) {
+        return true; // No previous entry for this user, so it's new
+      }
+      return new Date(entry.timestamp).getTime() > latestDbTimestamp.getTime();
+    });
+
+    if (unsortedNewData.length === 0) {
+      await client.query('COMMIT');
+      return NextResponse.json(
+        {
+          message: 'No new heart rate data to process.',
+          records_processed: 0,
+        },
+        { status: 200 }
+      );
+    }
+
     // Sort data by timestamp to ensure correct chronological processing
-    const sortedData = parsedPayload.data.data.sort(
+    const sortedData = unsortedNewData.sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
@@ -70,8 +102,6 @@ export async function POST(request: Request) {
                   minuteIterator.setMilliseconds(0);
       
                   // Move to the start of the next full minute after previousTimestamp
-                  // If previousTimestamp was 10:00:30, minuteIterator becomes 10:01:00
-                  // If previousTimestamp was 10:00:00, minuteIterator becomes 10:01:00
                   minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
       
                   const currentEntryMinuteStart = new Date(currentTimestamp);
@@ -79,12 +109,10 @@ export async function POST(request: Request) {
                   currentEntryMinuteStart.setMilliseconds(0);
       
                   while (minuteIterator.getTime() < currentEntryMinuteStart.getTime()) {
-                      // Calculate interpolation factor at the start of this minute (minuteIterator)
                       let interpolationFactor = 0;
                       if (timeDiffMilliseconds > 0) {
                           interpolationFactor = (minuteIterator.getTime() - previousTimestamp.getTime()) / timeDiffMilliseconds;
                       }
-                      // Clamp factor to ensure it's between 0 and 1 (inclusive)
                       interpolationFactor = Math.max(0, Math.min(1, interpolationFactor));
       
                       const interpolatedBpm = Math.round(
@@ -92,7 +120,6 @@ export async function POST(request: Request) {
                       );
                       pointsToAssign += calculatePointsForBpm(interpolatedBpm);
       
-                      // Move to the next minute
                       minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
                   }
                   // Add points for the current entry's BPM
@@ -112,43 +139,20 @@ export async function POST(request: Request) {
       previousEntry = currentEntry;
     }
 
-    // Batch insert all generated data, only new or newer entries
+    newRecordsToInsertCount = recordsToInsert.length; // For debugging
+
+    // Batch insert all new records
     if (recordsToInsert.length > 0) {
-      const uniqueUsernames = [...new Set(recordsToInsert.map(record => record.username))];
-
-      // Fetch the latest timestamp for each unique username from the database
-      const latestTimestampsResult = await client.query(
-        `SELECT username, MAX(timestamp) as latest_timestamp FROM heart_rate_data WHERE username = ANY($1::text[]) GROUP BY username`,
-        [uniqueUsernames]
+      const insertPromises = recordsToInsert.map((entry) =>
+        client.query(
+          'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
+          [entry.username, entry.bpm, entry.timestamp, entry.points]
+        )
       );
-
-      const latestTimestampMap = new Map<string, Date>();
-      latestTimestampsResult.rows.forEach(row => {
-        latestTimestampMap.set(row.username, new Date(row.latest_timestamp));
-      });
-      existingEntriesCount = latestTimestampsResult.rows.length; // For debugging, now counts users with existing entries
-
-      const newRecordsToInsert = recordsToInsert.filter(entry => {
-        const incomingTimestamp = new Date(entry.timestamp);
-        const latestDbTimestamp = latestTimestampMap.get(entry.username);
-
-        // If no entry exists for this username OR the incoming timestamp is newer than the latest in DB
-        return !latestDbTimestamp || incomingTimestamp.getTime() > latestDbTimestamp.getTime();
-      });
-      newRecordsToInsertCount = newRecordsToInsert.length; // For debugging
-
-      if (newRecordsToInsert.length > 0) {
-        const insertPromises = newRecordsToInsert.map((entry) =>
-          client.query(
-            'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
-            [entry.username, entry.bpm, entry.timestamp, entry.points]
-          )
-        );
-        await Promise.all(insertPromises);
-        recordsProcessed = newRecordsToInsert.length;
-      } else {
-        recordsProcessed = 0;
-      }
+      await Promise.all(insertPromises);
+      recordsProcessed = recordsToInsert.length;
+    } else {
+      recordsProcessed = 0;
     }
 
     await client.query('COMMIT');
