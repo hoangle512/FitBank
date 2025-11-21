@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { db } from '../../../lib/db'; // Import db pool
 
 function getWeekRange(date: Date): { start: Date; end: Date } {
   const start = new Date(date);
@@ -22,17 +22,18 @@ export async function GET(request: Request) {
 
   const { start, end } = getWeekRange(targetDate);
 
+  const client = await db.connect(); // Get a client from the pool
   try {
-    const result = await sql`
+    const result = await client.query(`
       SELECT
         hrd.username,
         SUM(hrd.points) as total_score
       FROM heart_rate_data hrd
-      WHERE hrd.timestamp >= ${start.toISOString()} AND hrd.timestamp <= ${end.toISOString()}
+      WHERE hrd.timestamp >= '${start.toISOString()}' AND hrd.timestamp <= '${end.toISOString()}'
       GROUP BY hrd.username
       ORDER BY total_score DESC
       LIMIT 100;
-    `;
+    `);
 
     // Add rank
     const leaderboard = result.rows.map((row, index) => ({
@@ -48,11 +49,13 @@ export async function GET(request: Request) {
       },
       leaderboard,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching leaderboard data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch leaderboard data.' },
+      { error: 'Failed to fetch leaderboard data.', details: error.message },
       { status: 500 }
     );
+  } finally {
+    client.release(); // Release the client back to the pool
   }
 }
