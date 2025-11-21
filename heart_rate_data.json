@@ -1,104 +1,104 @@
 {
   "data": [
     {
-      "bpm": 73,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T09:42:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:24:02Z"
     },
     {
-      "bpm": 77,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T09:47:38Z"
+      "bpm": 151,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:29:02Z"
     },
     {
-      "bpm": 72,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T09:52:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:34:02Z"
     },
     {
-      "bpm": 74,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T09:57:38Z"
+      "bpm": 151,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:39:02Z"
     },
     {
-      "bpm": 78,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:02:38Z"
+      "bpm": 152,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:44:02Z"
     },
     {
-      "bpm": 73,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:07:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:49:02Z"
     },
     {
-      "bpm": 69,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:12:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:54:02Z"
     },
     {
-      "bpm": 73,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:17:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T10:59:02Z"
     },
     {
-      "bpm": 75,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:22:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:04:02Z"
     },
     {
-      "bpm": 78,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:27:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:09:02Z"
     },
     {
-      "bpm": 76,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:32:38Z"
+      "bpm": 155,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:14:02Z"
     },
     {
-      "bpm": 80,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:37:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:19:02Z"
     },
     {
-      "bpm": 80,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:42:38Z"
+      "bpm": 150,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:24:02Z"
     },
     {
-      "bpm": 83,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:47:38Z"
+      "bpm": 154,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:29:02Z"
     },
     {
-      "bpm": 84,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:52:38Z"
+      "bpm": 155,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:34:02Z"
     },
     {
-      "bpm": 79,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T10:57:38Z"
+      "bpm": 154,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:39:02Z"
     },
     {
-      "bpm": 82,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T11:02:38Z"
+      "bpm": 157,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:44:02Z"
     },
     {
-      "bpm": 80,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T11:07:38Z"
+      "bpm": 160,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:49:02Z"
     },
     {
-      "bpm": 79,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T11:12:38Z"
+      "bpm": 165,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:54:02Z"
     },
     {
-      "bpm": 82,
-      "user": "Shaq",
-      "timestamp": "2025-11-21T11:17:38Z"
+      "bpm": 165,
+      "username": "Shaq",
+      "timestamp": "2025-11-21T11:59:02Z"
     }
   ]
 }
