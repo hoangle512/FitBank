@@ -1,21 +1,30 @@
 "use server"
 
-import { createClient } from "./supabase/server"
+import { createClient } from "@/utils/supabase/server";
 
-// Define a type for our standings data for type safety.
+// This interface represents the data shape returned by the RPC function from the DB.
+interface StandingFromRpc {
+  username: string
+  score: number | string // Supabase might return BigInts as numbers or strings
+  coins: number | string
+  avatar: string | null
+}
+
+// Define a type for our standings data for frontend safety.
 export interface Standing {
   rank: number
   username: string
-  score: number | bigint
-  coins: number | bigint
+  score: number
+  coins: number
   avatar: string | null
 }
 
 export async function getWeeklyStandings(): Promise<Standing[]> {
-  const supabase = createClient()
+  // 1. Await the client creation
+  const supabase = await createClient()
 
   try {
-    // Call the PostgreSQL function `get_weekly_standings` we created.
+    // 2. Call rpc without the generic <StandingFromRpc> 
     const { data, error } = await supabase.rpc("get_weekly_standings")
 
     if (error) {
@@ -23,11 +32,18 @@ export async function getWeeklyStandings(): Promise<Standing[]> {
       return []
     }
 
-    // Add rank to each player based on their position in the sorted array.
-    return (data || []).map((row, index) => ({
-      ...row,
+    // 3. Cast data to our known type to help TypeScript
+    const standingsData = data as StandingFromRpc[] | null
+
+    // 4. Map and clean the data
+    return (standingsData || []).map((row, index) => ({
+      username: row.username,
+      // Convert to Number to prevent BigInt serialization issues in Client Components
+      score: Number(row.score), 
+      coins: Number(row.coins),
+      avatar: row.avatar,
       rank: index + 1,
-    })) as Standing[]
+    }))
   } catch (error) {
     console.error("Database Error:", error)
     return []
