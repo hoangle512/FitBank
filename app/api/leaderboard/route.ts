@@ -49,10 +49,10 @@ export async function GET(request: Request) {
       },
       leaderboard,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching leaderboard data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch leaderboard data.', details: error.message },
+      { error: 'Failed to fetch leaderboard data.', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   } finally {

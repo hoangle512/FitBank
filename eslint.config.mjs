@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "lib/**/*.js", // Ignore all .js files in lib directory, as they are transpiled output
   ]),
 ]);
 

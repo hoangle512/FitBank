@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     );
 
     let previousEntry: HeartRateEntry | null = null;
-    const recordsToInsert: {
+    const allMinuteIntervalRecords: {
       username: string;
       bpm: number;
       timestamp: string;
@@ -86,71 +86,68 @@ export async function POST(request: Request) {
     }[] = [];
 
     for (const currentEntry of sortedData) {
-              let pointsToAssign = 0;
-              const currentTimestamp = new Date(currentEntry.timestamp);
+      const currentTimestamp = new Date(currentEntry.timestamp);
       
-              if (previousEntry) {
-                  const previousTimestamp = new Date(previousEntry.timestamp);
-                  const timeDiffMilliseconds = currentTimestamp.getTime() - previousTimestamp.getTime();
-      
-                  // Always add points for the previous entry's BPM at its timestamp
-                  pointsToAssign += calculatePointsForBpm(previousEntry.bpm);
-      
-                  // Calculate interpolated BPM and add points for each full minute interval between entries
-                  let minuteIterator = new Date(previousTimestamp);
-                  minuteIterator.setSeconds(0, 0);
-                  minuteIterator.setMilliseconds(0);
-      
-                  // Move to the start of the next full minute after previousTimestamp
-                  minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
-      
-                  const currentEntryMinuteStart = new Date(currentTimestamp);
-                  currentEntryMinuteStart.setSeconds(0, 0);
-                  currentEntryMinuteStart.setMilliseconds(0);
-      
-                  while (minuteIterator.getTime() < currentEntryMinuteStart.getTime()) {
-                      let interpolationFactor = 0;
-                      if (timeDiffMilliseconds > 0) {
-                          interpolationFactor = (minuteIterator.getTime() - previousTimestamp.getTime()) / timeDiffMilliseconds;
-                      }
-                      interpolationFactor = Math.max(0, Math.min(1, interpolationFactor));
-      
-                      const interpolatedBpm = Math.round(
-                          previousEntry.bpm + interpolationFactor * (currentEntry.bpm - previousEntry.bpm)
-                      );
-                      pointsToAssign += calculatePointsForBpm(interpolatedBpm);
-      
-                      minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
-                  }
-                  // Add points for the current entry's BPM
-                  pointsToAssign += calculatePointsForBpm(currentEntry.bpm);
-      
-              } else {
-                  // First entry, assign points for its BPM
-                  pointsToAssign = calculatePointsForBpm(currentEntry.bpm);
-              }
-      recordsToInsert.push({
+      if (previousEntry) {
+        const safePreviousEntry = previousEntry; // Assign to a local const
+        const previousTimestamp = new Date(safePreviousEntry.timestamp);
+        const timeDiffMilliseconds = currentTimestamp.getTime() - previousTimestamp.getTime();
+
+        // Calculate and add interpolated BPMs for each full minute interval between entries
+        const minuteIterator = new Date(previousTimestamp);
+        minuteIterator.setSeconds(0, 0);
+        minuteIterator.setMilliseconds(0);
+
+        // Move to the start of the next full minute after previousTimestamp
+        minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+
+        const currentEntryMinuteStart = new Date(currentTimestamp);
+        currentEntryMinuteStart.setSeconds(0, 0);
+        currentEntryMinuteStart.setMilliseconds(0);
+
+        while (minuteIterator.getTime() < currentEntryMinuteStart.getTime()) {
+          let interpolationFactor = 0;
+          if (timeDiffMilliseconds > 0) {
+            interpolationFactor = (minuteIterator.getTime() - previousTimestamp.getTime()) / timeDiffMilliseconds;
+          }
+          interpolationFactor = Math.max(0, Math.min(1, interpolationFactor));
+
+          const interpolatedBpm = Math.round(
+            safePreviousEntry.bpm + interpolationFactor * (currentEntry.bpm - safePreviousEntry.bpm)
+          );
+          allMinuteIntervalRecords.push({
+            username: currentEntry.username,
+            bpm: interpolatedBpm,
+            timestamp: minuteIterator.toISOString(),
+            points: calculatePointsForBpm(interpolatedBpm),
+          });
+
+          minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+        }
+      }
+      // Always add the current entry itself with its calculated points
+      allMinuteIntervalRecords.push({
         username: currentEntry.username,
         bpm: currentEntry.bpm,
         timestamp: currentEntry.timestamp,
-        points: pointsToAssign,
+        points: calculatePointsForBpm(currentEntry.bpm),
       });
 
       previousEntry = currentEntry;
     }
 
-    newRecordsToInsertCount = recordsToInsert.length; // For debugging
+    newRecordsToInsertCount = allMinuteIntervalRecords.length; // For debugging
 
     // Batch insert all new records
-    if (recordsToInsert.length > 0) {
-      const insertPromises = recordsToInsert.map((entry) =>
+    if (allMinuteIntervalRecords.length > 0) {
+      const insertPromises = allMinuteIntervalRecords.map((entry) =>
         client.query(
           'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
           [entry.username, entry.bpm, entry.timestamp, entry.points]
         )
       );
       await Promise.all(insertPromises);
-      recordsProcessed = recordsToInsert.length;
+      recordsProcessed = allMinuteIntervalRecords.length;
     } else {
       recordsProcessed = 0;
     }
@@ -167,11 +164,11 @@ export async function POST(request: Request) {
               }
             },
             { status: 201 }
-          );  } catch (error: any) {
+          );  } catch (error: unknown) {
     await client.query('ROLLBACK');
     console.error('Error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to process request.', details: error.message },
+      { error: 'Failed to process request.', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   } finally {
