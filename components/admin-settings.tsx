@@ -4,23 +4,48 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Settings, Save, Lock, Unlock } from "lucide-react"
-import { useState } from "react"
+import { Settings, Save, Lock, Unlock, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 
 export function AdminSettings() {
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [password, setPassword] = useState("")
-  const ADMIN_PASSWORD = "admin123" // In production, this should be in env variables
+  const [isLoading, setIsLoading] = useState(false)
+  const ADMIN_PASSWORD = "admin123" // In production, move this to env variables!
 
+  // State for settings
   const [competitionName, setCompetitionName] = useState("FitBank Challenge 2024")
-  const [targetPoints, setTargetPoints] = useState("1000")
+  const [targetPoints, setTargetPoints] = useState("500")
   const [z1, setZ1] = useState("")
   const [z2, setZ2] = useState("")
   const [z3, setZ3] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  
   const { toast } = useToast()
+
+  // Optional: Load current settings when component mounts
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/admin/settings')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.target_points) setTargetPoints(data.target_points.toString())
+          if (data.competition_name) setCompetitionName(data.competition_name)
+          if (data.z1) setZ1(data.z1.toString())
+          if (data.z2) setZ2(data.z2.toString())
+          if (data.z3) setZ3(data.z3.toString())
+          if (data.start_date) setStartDate(data.start_date)
+          if (data.end_date) setEndDate(data.end_date)
+        }
+      } catch (e) {
+        console.error("Failed to load settings")
+      }
+    }
+    fetchSettings()
+  }, [])
 
   const handleUnlock = () => {
     if (password === ADMIN_PASSWORD) {
@@ -38,16 +63,47 @@ export function AdminSettings() {
     }
   }
 
-  const handleSave = () => {
-    toast({
-      title: "Settings saved",
-      description: "Competition settings have been updated successfully.",
-    })
-  }
-
   const handleLock = () => {
     setIsUnlocked(false)
     setPassword("")
+  }
+
+  const handleSave = async () => {
+    setIsLoading(true)
+    try {
+      // Send the new target to the API
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          competition_name: competitionName,
+          target_points: parseInt(targetPoints),
+          z1: parseInt(z1),
+          z2: parseInt(z2),
+          z3: parseInt(z3),
+          start_date: startDate,
+          end_date: endDate,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update settings');
+      }
+
+      toast({
+        title: "Settings saved",
+        description: `Target set to ${targetPoints}. Leaderboard updated.`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Could not save settings. Check console.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (!isUnlocked) {
@@ -108,14 +164,15 @@ export function AdminSettings() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="target-points">Target Points</Label>
+            <Label htmlFor="target-points">Target Points (Weekly Fail Threshold)</Label>
             <Input
               id="target-points"
               type="number"
               value={targetPoints}
               onChange={(e) => setTargetPoints(e.target.value)}
-              placeholder="1000"
+              placeholder="500"
             />
+            <p className="text-xs text-muted-foreground">Users with fewer than this many points in a week will get a "Fail".</p>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -147,8 +204,8 @@ export function AdminSettings() {
             </div>
           </div>
 
-          <Button onClick={handleSave} className="w-full">
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSave} disabled={isLoading} className="w-full">
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Settings
           </Button>
         </div>

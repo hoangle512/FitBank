@@ -4,18 +4,42 @@ import { NextResponse } from "next/server"
 export async function GET() {
   const supabase = await createClient()
 
-  // Get aggregated leaderboard data
-  const { data, error } = await supabase
+  // Fetch start_date from app_settings
+  const { data: settingsData, error: settingsError } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .eq('key', 'start_date');
+
+  if (settingsError) {
+    console.error("Error fetching app_settings for start_date:", settingsError);
+    // Decide how to handle this error
+  }
+
+  const startDateSetting = settingsData?.find(s => s.key === 'start_date');
+  const competitionStartDate = startDateSetting?.value || null; // Default to null if not found
+
+  // First, call the RPC to calculate/update weekly stats
+  const { error: rpcError } = await supabase.rpc('calculate_weekly_stats', {
+    competition_start_date: competitionStartDate
+  });
+  if (rpcError) {
+    console.error("Error calling calculate_weekly_stats RPC:", rpcError);
+    // Continue fetching other data, as the RPC might not be critical for *display* if stats are pre-calculated
+    // Or handle this error more strictly if RPC failure should halt leaderboard display
+  }
+
+  // Get aggregated heart rate data
+  const { data: heartRateData, error: heartRateError } = await supabase
     .from("heart_rate_data")
     .select("username, points, bpm")
     .order("points", { ascending: false })
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (heartRateError) {
+    return NextResponse.json({ error: heartRateError.message }, { status: 500 })
   }
 
-  // Aggregate by username
-  const leaderboard = data.reduce((acc: any[], curr) => {
+  // Aggregate heart rate data by username
+  const aggregatedHeartRate = heartRateData.reduce((acc, curr) => {
     const existing = acc.find((item) => item.username === curr.username)
     if (existing) {
       existing.total_points += curr.points || 0
@@ -32,10 +56,34 @@ export async function GET() {
       })
     }
     return acc
-  }, [])
+  }, [] as any[]) // Explicitly type acc as any[]
+
+  // Fetch coins and fails from leaderboard_stats
+  const { data: leaderboardStats, error: leaderboardStatsError } = await supabase
+    .from("leaderboard_stats")
+    .select("username, coins, fails")
+
+  if (leaderboardStatsError) {
+    console.error("Error fetching leaderboard_stats:", leaderboardStatsError);
+    // Decide how to handle this error: return partial data, or an error response
+    // For now, we'll proceed and merge what we have, possibly leaving coins/fails as undefined
+  }
+
+  // Merge aggregated heart rate data with leaderboard stats
+  const finalLeaderboard = aggregatedHeartRate.map(hrEntry => {
+    const stats = leaderboardStats?.find(lsEntry => lsEntry.username === hrEntry.username);
+    return {
+      ...hrEntry,
+      coins: stats?.coins || 0,
+      fails: stats?.fails || 0,
+    };
+  });
 
   // Sort by total points
-  leaderboard.sort((a, b) => b.total_points - a.total_points)
+  finalLeaderboard.sort((a, b) => b.total_points - a.total_points)
 
-  return NextResponse.json(leaderboard)
+  // Calculate total fails for the prize pool
+  const totalFails = leaderboardStats?.reduce((sum, entry) => sum + (entry.fails || 0), 0) || 0;
+
+  return NextResponse.json({ leaderboard: finalLeaderboard, total_fails: totalFails })
 }

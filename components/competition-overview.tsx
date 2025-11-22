@@ -7,14 +7,18 @@ import useSWR from "swr"
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export function CompetitionOverview() {
-  const { data: leaderboard } = useSWR("/api/leaderboard", fetcher, {
+  const { data } = useSWR("/api/leaderboard", fetcher, {
     refreshInterval: 5000,
   })
 
-  const stats = {
-    prizePool: "$10,000", // In production, this would come from settings
-    competitionEndDate: "December 31, 2024", // In production, this would come from settings
-  }
+  const { data: adminSettings } = useSWR("/api/admin/settings", fetcher, {
+    refreshInterval: 60000, // Refresh less frequently for settings
+  })
+
+  const totalFails = data?.total_fails || 0;
+  const prizePool = totalFails * 1000;
+  
+  const competitionEndDate = adminSettings?.end_date || "N/A"; // Use fetched end_date
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -24,8 +28,8 @@ export function CompetitionOverview() {
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.prizePool}</div>
-          <p className="text-xs text-muted-foreground mt-1">Total prize money</p>
+          <div className="text-2xl font-bold">{prizePool} CZK</div>
+          <p className="text-xs text-muted-foreground mt-1">Total prize money based on fails</p>
         </CardContent>
       </Card>
 
@@ -35,7 +39,7 @@ export function CompetitionOverview() {
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{stats.competitionEndDate}</div>
+          <div className="text-2xl font-bold">{competitionEndDate}</div>
           <p className="text-xs text-muted-foreground mt-1">Final submission date</p>
         </CardContent>
       </Card>

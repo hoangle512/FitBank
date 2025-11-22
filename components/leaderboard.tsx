@@ -7,9 +7,12 @@ import useSWR from "swr"
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export function Leaderboard() {
-  const { data: leaderboard } = useSWR("/api/leaderboard", fetcher, {
+  // Polls the API every 5 seconds for updates
+  const { data } = useSWR("/api/leaderboard", fetcher, {
     refreshInterval: 5000,
   })
+
+  const leaderboardList = data?.leaderboard || [];
 
   const getRankIcon = (index: number) => {
     if (index === 0) return <Trophy className="h-5 w-5 text-yellow-500" />
@@ -36,7 +39,7 @@ export function Leaderboard() {
               </tr>
             </thead>
             <tbody>
-              {leaderboard?.map((participant: any, index: number) => (
+              {leaderboardList.map((participant: any, index: number) => (
                 <tr
                   key={participant.username}
                   className="border-b border-border hover:bg-secondary/50 transition-colors"
@@ -47,23 +50,27 @@ export function Leaderboard() {
                   <td className="p-3">
                     <div>
                       <p className="font-medium">{participant.username}</p>
-                      <p className="text-xs text-muted-foreground">Avg {participant.avg_bpm} BPM</p>
+                      <p className="text-xs text-muted-foreground">Avg {participant.avg_bpm || 0} BPM</p>
                     </div>
                   </td>
                   <td className="p-3 text-right">
                     <p className="font-bold text-primary">{participant.total_points}</p>
                   </td>
                   <td className="p-3 text-right">
-                    <p className="font-medium">{Math.floor(participant.total_points / 10)}</p>
+                    {/* Displays Coins from DB (Wins) */}
+                    <div className="flex items-center justify-end gap-1">
+                        <span className="font-medium text-amber-500">{participant.coins ?? 0}</span>
+                    </div>
                   </td>
                   <td className="p-3 text-right">
-                    <p className="font-medium text-destructive">{Math.floor(Math.random() * 5)}</p>
+                    {/* Displays Fails from DB */}
+                    <p className="font-medium text-destructive">{participant.fails ?? 0}</p>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {(!leaderboard || leaderboard.length === 0) && (
+          {(!leaderboardList || leaderboardList.length === 0) && (
             <div className="text-center py-8 text-muted-foreground">No participants yet</div>
           )}
         </div>
