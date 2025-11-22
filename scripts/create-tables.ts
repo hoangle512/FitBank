@@ -14,7 +14,8 @@ async function createTables() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(255),
         bpm INT NOT NULL,
-        timestamp TIMESTAMPTZ NOT NULL
+        timestamp TIMESTAMPTZ NOT NULL,
+        points INT NOT NULL DEFAULT 0
       );
     `;
 
