@@ -1,7 +1,36 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Info } from "lucide-react"
+import { useEffect, useState } from "react"
+
+interface AdminSettings {
+  z1: string;
+  z2: string;
+  z3: string;
+  target_points: string;
+}
 
 export function CompetitionRules() {
+  const [settings, setSettings] = useState<AdminSettings | null>(null)
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/admin/settings")
+        if (res.ok) {
+          const data = await res.json()
+          setSettings(data)
+        } else {
+          console.error("Failed to fetch settings")
+        }
+      } catch (e) {
+        console.error("Failed to fetch settings", e)
+      }
+    }
+    fetchSettings()
+  }, [])
+
   return (
     <Card>
       <CardHeader>
@@ -11,40 +40,35 @@ export function CompetitionRules() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-4">
           <div>
-            <h4 className="font-semibold text-foreground mb-1">1. Participation</h4>
+            <h4 className="font-semibold text-foreground mb-1">1. Scoring</h4>
+            <p className="mb-2">
+              Points are awarded based on heart rate readings. Consistent monitoring and achieving target zones will earn you more points: 
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              <li>Zone 1: <strong>{settings?.z1 ?? "..."} points</strong></li>
+              <li>Zone 2: <strong>{settings?.z2 ?? "..."} points</strong></li>
+              <li>Zone 3: <strong>{settings?.z3 ?? "..."} points</strong></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-foreground mb-1">2. Fails</h4>
             <p>
-              All participants must register with a valid username and maintain accurate heart rate data throughout the
-              competition period.
+              <strong>{settings?.target_points ?? "..."} Points</strong> - If a participant fails to collect the minimum
+              number of target points for the week, 1000czk goes into the bank.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">2. Scoring</h4>
+            <h4 className="font-semibold text-foreground mb-1">3. Winner Selection</h4>
             <p>
-              Points are awarded based on heart rate readings. Consistent monitoring and achieving target zones will
-              earn you more points. Coins are earned at a rate of 1 coin per 10 points.
+              The winner is determined by the highest total points at the end of each week and receives a coin. Coins can be used to pay for your fails.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">3. Fails</h4>
+            <h4 className="font-semibold text-foreground mb-1">4. Prize Distribution</h4>
             <p>
-              Fails are recorded when heart rate readings are outside the acceptable range or when data submission
-              errors occur. Excessive fails may result in point deductions.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-foreground mb-1">4. Winner Selection</h4>
-            <p>
-              The winner is determined by the highest total points at the end of the competition period. In case of a
-              tie, the participant with fewer fails wins.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-foreground mb-1">5. Prize Distribution</h4>
-            <p>
-              Prize pool will be distributed among the top 3 participants: 1st place (50%), 2nd place (30%), 3rd place
-              (20%).
+              Prize pool will be spent on a social event at the end of the Competition.
             </p>
           </div>
         </div>

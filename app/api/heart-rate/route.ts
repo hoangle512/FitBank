@@ -34,6 +34,23 @@ export async function POST(request: Request) {
       );
     }
 
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('app_settings')
+      .select('value, key');
+
+    if (settingsError) {
+      console.error('Error fetching settings:', settingsError);
+      // Fallback to default values if settings can't be fetched
+    }
+
+    const settings = settingsData?.reduce((acc, item) => {
+      acc[item.key] = item.value;
+      return acc;
+    }, {} as Record<string, string>) || {};
+
+    const z1 = parseInt(settings.z1 || "125", 10);
+    const z2 = parseInt(settings.z2 || "150", 10);
+    const z3 = parseInt(settings.z3 || "165", 10);
     const incomingData = parsedPayload.data.data;
     const uniqueUsernames = [...new Set(incomingData.map((d) => d.username))];
 
@@ -120,7 +137,7 @@ export async function POST(request: Request) {
               username: username,
               bpm: interpolatedBpm,
               timestamp: minuteIterator.toISOString(),
-              points: calculatePointsForBpm(interpolatedBpm),
+              points: calculatePointsForBpm(interpolatedBpm, z1, z2, z3),
             });
 
             minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
@@ -132,7 +149,7 @@ export async function POST(request: Request) {
           username: username,
           bpm: currentEntry.bpm,
           timestamp: currentEntry.timestamp,
-          points: calculatePointsForBpm(currentEntry.bpm),
+          points: calculatePointsForBpm(currentEntry.bpm, z1, z2, z3),
         });
 
         previousEntry = currentEntry;
