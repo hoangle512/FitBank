@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db';
+import { createClient } from '@/lib/supabase/server'; // Make sure this path is correct
 import { calculatePointsForBpm } from '../../../lib/scoring';
 import { z } from 'zod';
 
-// Define the expected data structure for a single heart rate entry using Zod
+// Define the expected data structure
 const HeartRateDataSchema = z.object({
   bpm: z.number().int(),
-  timestamp: z.string().datetime(), // ISO 8601 format
+  timestamp: z.string().datetime(),
   username: z.string().min(1),
 });
 
@@ -21,11 +21,9 @@ interface HeartRateEntry {
 }
 
 export async function POST(request: Request) {
-  const client = await db.connect();
+  const supabase = await createClient();
+
   try {
-    let recordsProcessed = 0; // Declare recordsProcessed here
-    let existingEntriesCount = 0; // Declare for debugging
-    let newRecordsToInsertCount = 0; // Declare for debugging
     const json = await request.json();
     const parsedPayload = HeartRatePayloadSchema.safeParse(json);
 
@@ -36,142 +34,133 @@ export async function POST(request: Request) {
       );
     }
 
-    await client.query('BEGIN');
-    // Temporarily clear previous heart rate data for Shaq for a clean test run
+    const incomingData = parsedPayload.data.data;
+    const uniqueUsernames = [...new Set(incomingData.map((d) => d.username))];
 
+    // 1. Fetch latest timestamps for these users from Supabase
+    // We use a raw RPC call or a specific query to get max timestamp per user.
+    // Since Supabase simple client doesn't do "GROUP BY" easily on SELECT, 
+    // we will fetch the latest record for each user.
+    
+    const latestTimestampMap = new Map<string, number>();
+    
+    // Note: For efficiency in production, you might want a separate 'user_stats' table 
+    // that tracks the last_sync_timestamp, but this works for now.
+    const { data: existingLatest } = await supabase
+      .from('heart_rate_data')
+      .select('username, timestamp')
+      .in('username', uniqueUsernames)
+      .order('timestamp', { ascending: false });
 
-    // Fetch latest timestamps for all users in the payload
-    const allUsernames = [...new Set(parsedPayload.data.data.map(d => d.username))];
-    const latestTimestampsResult = await client.query(
-      `SELECT username, MAX(timestamp) as latest_timestamp FROM heart_rate_data WHERE username = ANY($1::text[]) GROUP BY username`,
-      [allUsernames]
-    );
-    const latestTimestampMap = new Map<string, Date>();
-    latestTimestampsResult.rows.forEach(row => {
-      latestTimestampMap.set(row.username, new Date(row.latest_timestamp));
-    });
-    existingEntriesCount = latestTimestampsResult.rows.length;
-
-    // Filter out data that is not newer than the latest recorded timestamp
-    const unsortedNewData = parsedPayload.data.data.filter(entry => {
-      const latestDbTimestamp = latestTimestampMap.get(entry.username);
-      if (!latestDbTimestamp) {
-        return true; // No previous entry for this user, so it's new
-      }
-      return new Date(entry.timestamp).getTime() > latestDbTimestamp.getTime();
-    });
-
-    if (unsortedNewData.length === 0) {
-      await client.query('COMMIT');
-      return NextResponse.json(
-        {
-          message: 'No new heart rate data to process.',
-          records_processed: 0,
-        },
-        { status: 200 }
-      );
-    }
-
-    // Sort data by timestamp to ensure correct chronological processing
-    const sortedData = unsortedNewData.sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-
-    let previousEntry: HeartRateEntry | null = null;
-    const allMinuteIntervalRecords: {
-      username: string;
-      bpm: number;
-      timestamp: string;
-      points: number;
-    }[] = [];
-
-    for (const currentEntry of sortedData) {
-      const currentTimestamp = new Date(currentEntry.timestamp);
-      
-      if (previousEntry) {
-        const safePreviousEntry = previousEntry; // Assign to a local const
-        const previousTimestamp = new Date(safePreviousEntry.timestamp);
-        const timeDiffMilliseconds = currentTimestamp.getTime() - previousTimestamp.getTime();
-
-        // Calculate and add interpolated BPMs for each full minute interval between entries
-        const minuteIterator = new Date(previousTimestamp);
-        minuteIterator.setSeconds(0, 0);
-        minuteIterator.setMilliseconds(0);
-
-        // Move to the start of the next full minute after previousTimestamp
-        minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
-
-        const currentEntryMinuteStart = new Date(currentTimestamp);
-        currentEntryMinuteStart.setSeconds(0, 0);
-        currentEntryMinuteStart.setMilliseconds(0);
-
-        while (minuteIterator.getTime() < currentEntryMinuteStart.getTime()) {
-          let interpolationFactor = 0;
-          if (timeDiffMilliseconds > 0) {
-            interpolationFactor = (minuteIterator.getTime() - previousTimestamp.getTime()) / timeDiffMilliseconds;
-          }
-          interpolationFactor = Math.max(0, Math.min(1, interpolationFactor));
-
-          const interpolatedBpm = Math.round(
-            safePreviousEntry.bpm + interpolationFactor * (currentEntry.bpm - safePreviousEntry.bpm)
-          );
-          allMinuteIntervalRecords.push({
-            username: currentEntry.username,
-            bpm: interpolatedBpm,
-            timestamp: minuteIterator.toISOString(),
-            points: calculatePointsForBpm(interpolatedBpm),
-          });
-
-          minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+    // Process the list to find the absolute latest per user (since the query returns all rows)
+    // A better way in raw SQL is simpler, but with JS client:
+    if (existingLatest) {
+      for (const row of existingLatest) {
+        if (!latestTimestampMap.has(row.username)) {
+          latestTimestampMap.set(row.username, new Date(row.timestamp).getTime());
         }
       }
-      // Always add the current entry itself with its calculated points
-      allMinuteIntervalRecords.push({
-        username: currentEntry.username,
-        bpm: currentEntry.bpm,
-        timestamp: currentEntry.timestamp,
-        points: calculatePointsForBpm(currentEntry.bpm),
-      });
-
-      previousEntry = currentEntry;
     }
 
-    newRecordsToInsertCount = allMinuteIntervalRecords.length; // For debugging
+    // 2. Filter out data that is already in the DB
+    const newRecordsToProcess = incomingData.filter((entry) => {
+      const latestTime = latestTimestampMap.get(entry.username);
+      if (!latestTime) return true; // New user
+      return new Date(entry.timestamp).getTime() > latestTime;
+    });
 
-    // Batch insert all new records
-    if (allMinuteIntervalRecords.length > 0) {
-      const insertPromises = allMinuteIntervalRecords.map((entry) =>
-        client.query(
-          'INSERT INTO heart_rate_data (username, bpm, timestamp, points) VALUES ($1, $2, $3, $4)',
-          [entry.username, entry.bpm, entry.timestamp, entry.points]
-        )
+    if (newRecordsToProcess.length === 0) {
+      return NextResponse.json({ message: 'No new data to process', records_processed: 0 });
+    }
+
+    // 3. CRITICAL FIX: Group data by User BEFORE interpolating
+    const recordsByUser: Record<string, HeartRateEntry[]> = {};
+    
+    newRecordsToProcess.forEach((record) => {
+      if (!recordsByUser[record.username]) recordsByUser[record.username] = [];
+      recordsByUser[record.username].push(record);
+    });
+
+    const finalInsertPayload: any[] = [];
+
+    // 4. Process each user separately
+    for (const username of Object.keys(recordsByUser)) {
+      // Sort this specific user's data chronologically
+      const userEntries = recordsByUser[username].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
-      await Promise.all(insertPromises);
-      recordsProcessed = allMinuteIntervalRecords.length;
-    } else {
-      recordsProcessed = 0;
+
+      let previousEntry: HeartRateEntry | null = null;
+
+      for (const currentEntry of userEntries) {
+        const currentTimestamp = new Date(currentEntry.timestamp);
+
+        if (previousEntry) {
+          const prevTimestamp = new Date(previousEntry.timestamp);
+          const timeDiff = currentTimestamp.getTime() - prevTimestamp.getTime();
+
+          // Interpolation Logic
+          const minuteIterator = new Date(prevTimestamp);
+          minuteIterator.setSeconds(0, 0);
+          minuteIterator.setMinutes(minuteIterator.getMinutes() + 1); // Move to next full minute
+
+          const currentMinuteStart = new Date(currentTimestamp);
+          currentMinuteStart.setSeconds(0, 0);
+
+          while (minuteIterator.getTime() < currentMinuteStart.getTime()) {
+            let factor = 0;
+            if (timeDiff > 0) {
+              factor = (minuteIterator.getTime() - prevTimestamp.getTime()) / timeDiff;
+            }
+            const interpolatedBpm = Math.round(
+              previousEntry.bpm + factor * (currentEntry.bpm - previousEntry.bpm)
+            );
+
+            finalInsertPayload.push({
+              username: username,
+              bpm: interpolatedBpm,
+              timestamp: minuteIterator.toISOString(),
+              points: calculatePointsForBpm(interpolatedBpm),
+            });
+
+            minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+          }
+        }
+
+        // Add the actual current entry
+        finalInsertPayload.push({
+          username: username,
+          bpm: currentEntry.bpm,
+          timestamp: currentEntry.timestamp,
+          points: calculatePointsForBpm(currentEntry.bpm),
+        });
+
+        previousEntry = currentEntry;
+      }
     }
 
-    await client.query('COMMIT');
+    // 5. Bulk Insert into Supabase
+    if (finalInsertPayload.length > 0) {
+      const { error } = await supabase
+        .from('heart_rate_data')
+        .insert(finalInsertPayload);
 
-          return NextResponse.json(
-            {
-              message: 'Heart rate data saved successfully.',
-              records_processed: recordsProcessed,
-              debug: {
-                existingEntriesCount: existingEntriesCount,
-                newRecordsToInsertCount: newRecordsToInsertCount,
-              }
-            },
-            { status: 201 }
-          );  } catch (error: unknown) {
-    await client.query('ROLLBACK');
+      if (error) throw error;
+    }
+
+    return NextResponse.json(
+      {
+        message: 'Heart rate data saved successfully.',
+        records_processed: finalInsertPayload.length,
+      },
+      { status: 201 }
+    );
+
+  } catch (error) {
     console.error('Error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to process request.', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to process request', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
-  } finally {
-    client.release();
   }
 }
