@@ -1,61 +1,41 @@
-import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db'; // Import db pool
+import { createClient } from "@/lib/supabase/server"
+import { NextResponse } from "next/server"
 
-function getWeekRange(date: Date): { start: Date; end: Date } {
-  const start = new Date(date);
-  const day = start.getDay();
-  const diff = start.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-  start.setDate(diff);
-  start.setHours(0, 0, 0, 0);
+export async function GET() {
+  const supabase = await createClient()
 
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
+  // Get aggregated leaderboard data
+  const { data, error } = await supabase
+    .from("heart_rate_data")
+    .select("username, points, bpm")
+    .order("points", { ascending: false })
 
-  return { start, end };
-}
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const dateParam = searchParams.get('date');
-  const targetDate = dateParam ? new Date(dateParam) : new Date();
-
-  const { start, end } = getWeekRange(targetDate);
-
-  const client = await db.connect(); // Get a client from the pool
-  try {
-    const result = await client.query(`
-      SELECT
-        hrd.username,
-        SUM(hrd.points) as total_score
-      FROM heart_rate_data hrd
-      WHERE hrd.timestamp >= '${start.toISOString()}' AND hrd.timestamp <= '${end.toISOString()}'
-      GROUP BY hrd.username
-      ORDER BY total_score DESC
-      LIMIT 100;
-    `);
-
-    // Add rank
-    const leaderboard = result.rows.map((row, index) => ({
-      rank: index + 1,
-      displayName: row.username,
-      score: Number(row.total_score),
-    }));
-
-    return NextResponse.json({
-      week: {
-        start: start.toISOString().split('T')[0],
-        end: end.toISOString().split('T')[0],
-      },
-      leaderboard,
-    });
-  } catch (error: unknown) {
-    console.error('Error fetching leaderboard data:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch leaderboard data.', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  } finally {
-    client.release(); // Release the client back to the pool
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Aggregate by username
+  const leaderboard = data.reduce((acc: any[], curr) => {
+    const existing = acc.find((item) => item.username === curr.username)
+    if (existing) {
+      existing.total_points += curr.points || 0
+      existing.readings += 1
+      existing.avg_bpm = Math.round((existing.avg_bpm * (existing.readings - 1) + (curr.bpm || 0)) / existing.readings)
+      existing.max_bpm = Math.max(existing.max_bpm, curr.bpm || 0)
+    } else {
+      acc.push({
+        username: curr.username,
+        total_points: curr.points || 0,
+        readings: 1,
+        avg_bpm: curr.bpm || 0,
+        max_bpm: curr.bpm || 0,
+      })
+    }
+    return acc
+  }, [])
+
+  // Sort by total points
+  leaderboard.sort((a, b) => b.total_points - a.total_points)
+
+  return NextResponse.json(leaderboard)
 }

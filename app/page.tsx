@@ -1,9 +1,38 @@
-import { CompetitionDashboard } from "@/components/competition-dashboard"
+import { CompetitionOverview } from "@/components/competition-overview"
+import { Leaderboard } from "@/components/leaderboard"
+import { AdminSettings } from "@/components/admin-settings"
+import { CompetitionRules } from "@/components/competition-rules"
 
 export default function Page() {
   return (
     <div className="min-h-screen bg-background">
-      <CompetitionDashboard />
+      <div className="border-b border-border">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">FitBank Dashboard</h1>
+              <p className="text-muted-foreground mt-1">Real-time heart rate competition tracking</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm text-muted-foreground">Live</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="space-y-8">
+          <CompetitionOverview />
+
+          <Leaderboard />
+
+          <div className="grid gap-8 lg:grid-cols-2">
+            <CompetitionRules />
+            <AdminSettings />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
