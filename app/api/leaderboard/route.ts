@@ -29,9 +29,20 @@ export async function GET() {
   }
 
   // Get aggregated heart rate data
+  // Calculate the start of the current week (Monday)
+  const now = new Date();
+  const day = now.getDay(); // 0 for Sunday, 1 for Monday
+  // Adjust to the most recent Monday. If today is Monday, it will be today's Monday.
+  // If today is Sunday, it will go back to the previous Monday.
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const startOfWeek = new Date(now.setDate(diff));
+  startOfWeek.setHours(0, 0, 0, 0); // Set to the very beginning of Monday
+  const startOfWeekISO = startOfWeek.toISOString(); // Format for Supabase filter
+
   const { data: heartRateData, error: heartRateError } = await supabase
     .from("heart_rate_data")
     .select("username, points, bpm")
+    .gte('timestamp', startOfWeekISO) // Filter for current week
     .order("points", { ascending: false })
 
   if (heartRateError) {
