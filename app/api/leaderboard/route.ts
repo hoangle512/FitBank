@@ -4,23 +4,23 @@ import { NextResponse } from "next/server"
 export async function GET() {
   const supabase = await createClient()
 
-  // Fetch start_date from app_settings
+  // Fetch target_points from app_settings
   const { data: settingsData, error: settingsError } = await supabase
     .from('app_settings')
     .select('key, value')
-    .eq('key', 'start_date');
+    .in('key', ['start_date', 'target_points']); // Fetch both if needed, or just target_points
 
   if (settingsError) {
-    console.error("Error fetching app_settings for start_date:", settingsError);
+    console.error("Error fetching app_settings:", settingsError);
     // Decide how to handle this error
   }
 
-  const startDateSetting = settingsData?.find(s => s.key === 'start_date');
-  const competitionStartDate = startDateSetting?.value || null; // Default to null if not found
+  const targetPointsSetting = settingsData?.find(s => s.key === 'target_points');
+  const targetPointsValue = Number(targetPointsSetting?.value) || 0; // Default to 0 if not found or invalid
 
   // First, call the RPC to calculate/update weekly stats
   const { error: rpcError } = await supabase.rpc('calculate_weekly_stats', {
-    competition_start_date: competitionStartDate
+    fail_threshold: targetPointsValue
   });
   if (rpcError) {
     console.error("Error calling calculate_weekly_stats RPC:", rpcError);
