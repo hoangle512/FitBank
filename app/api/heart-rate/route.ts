@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     // Split the NDJSON string into individual JSON strings
-    const incomingDataStrings = parsedPayload.data.data.trim().split('\n');
+    const incomingDataStrings = parsedPayload.data.data.replace(/\\n/g, '\n').trim().split('\n');
     
     const incomingData: HeartRateEntry[] = [];
     for (const str of incomingDataStrings) {
