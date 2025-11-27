@@ -30,7 +30,7 @@ interface InsertPayload {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient(); // Moved here to ensure scope
+  const supabase = await createClient();
 
   try {
     const json = await request.json();
