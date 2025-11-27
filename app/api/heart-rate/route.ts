@@ -33,7 +33,21 @@ export async function POST(request: Request) {
   const supabase = await createClient();
 
   try {
-    const json = await request.json();
+    let json: any;
+
+    try {
+      json = await request.json();
+
+    } catch (e: any) {
+      if (e instanceof SyntaxError && e.message.includes('JSON')) {
+        return NextResponse.json(
+          { error: 'Invalid JSON payload', details: e.message },
+          { status: 400 }
+        );
+      }
+      throw e; // Re-throw other errors to be caught by the outer catch
+    }
+
     // console.log("Raw JSON received:", JSON.stringify(json, null, 2));
 
     const parsedPayload = HeartRatePayloadSchema.safeParse(json);
@@ -48,6 +62,7 @@ export async function POST(request: Request) {
     }
 
     const rawNdjsonString = parsedPayload.data.data;
+
     // console.log("Raw NDJSON string from payload:", rawNdjsonString);
 
     const incomingDataStrings = rawNdjsonString.trim().split('\n').filter(s => s !== '');

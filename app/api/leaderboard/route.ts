@@ -50,6 +50,13 @@ export async function GET() {
   }
 
   // Aggregate heart rate data by username
+  interface AggregatedHeartRate {
+    username: string;
+    total_points: number;
+    readings: number;
+    avg_bpm: number;
+    max_bpm: number;
+  }
   const aggregatedHeartRate = heartRateData.reduce((acc, curr) => {
     const existing = acc.find((item) => item.username === curr.username)
     if (existing) {
@@ -67,7 +74,7 @@ export async function GET() {
       })
     }
     return acc
-  }, [] as any[]) // Explicitly type acc as any[]
+  }, [] as AggregatedHeartRate[])
 
   // Fetch coins and fails from leaderboard_stats
   const { data: leaderboardStats, error: leaderboardStatsError } = await supabase

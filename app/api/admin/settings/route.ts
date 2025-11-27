@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/server"; // or your client path
 import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('app_settings')
@@ -100,11 +100,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
 
     console.error("Error in POST /api/admin/settings:", err);
 
-    return NextResponse.json({ error: err.message || "An unknown error occurred" }, { status: 500 });
+    const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
 
   }
 

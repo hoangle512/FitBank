@@ -40,7 +40,7 @@ export function AdminSettings() {
           if (data.start_date) setStartDate(data.start_date)
           if (data.end_date) setEndDate(data.end_date)
         }
-      } catch (e) {
+      } catch {
         console.error("Failed to load settings")
       }
     }
@@ -95,10 +95,11 @@ export function AdminSettings() {
         title: "Settings saved",
         description: `Target set to ${targetPoints}. Leaderboard updated.`,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Could not save settings. Check console.";
       toast({
         title: "Error",
-        description: error.message || "Could not save settings. Check console.",
+        description: message,
         variant: "destructive",
       })
     } finally {
@@ -172,7 +173,7 @@ export function AdminSettings() {
               onChange={(e) => setTargetPoints(e.target.value)}
               placeholder="500"
             />
-            <p className="text-xs text-muted-foreground">Users with fewer than this many points in a week will get a "Fail".</p>
+            <p className="text-xs text-muted-foreground">Users with fewer than this many points in a week will get a &quot;Fail&quot;.</p>
           </div>
 
           <div className="grid grid-cols-3 gap-4">

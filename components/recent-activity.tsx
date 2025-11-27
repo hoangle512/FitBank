@@ -38,7 +38,7 @@ export function RecentActivity() {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          {recentData.map((reading: any) => (
+          {recentData.map((reading: { id: number, username: string, timestamp: string, bpm: number, points: number }) => (
             <div
               key={reading.id}
               className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border"

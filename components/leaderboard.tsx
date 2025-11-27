@@ -39,7 +39,7 @@ export function Leaderboard() {
               </tr>
             </thead>
             <tbody>
-              {leaderboardList.map((participant: any, index: number) => (
+              {leaderboardList.map((participant: { username: string, avg_bpm: number, total_points: number, coins: number, fails: number }, index: number) => (
                 <tr
                   key={participant.username}
                   className="border-b border-border hover:bg-secondary/50 transition-colors"

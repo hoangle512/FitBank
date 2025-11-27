@@ -2,10 +2,26 @@
 import json
 import requests
 import os
+from datetime import datetime, timedelta, timezone
 
 # Configuration
-API_ENDPOINT = "http://localhost:3000/api/heart-rate" # Change to 3001 if your server is running on that port
+API_ENDPOINT = "http://localhost:3000/api/heart-rate"
 USERS = ['user_a', 'user_b', 'user_c']
+
+def update_timestamps(entries):
+    """Updates timestamps of entries to be recent, ensuring they are 'new' data."""
+    updated_entries = []
+    # Create a timezone object for UTC+1
+    tz = timezone(timedelta(hours=1))
+    # Start from current time minus a few minutes, and increment for each entry
+    current_time = datetime.now(tz) - timedelta(minutes=len(entries) + 1)
+
+    for entry in entries:
+        entry['timestamp'] = current_time.isoformat(timespec='seconds')
+        updated_entries.append(entry)
+        current_time += timedelta(minutes=1) # Increment for next entry
+    return updated_entries
+
 
 def send_data_for_user(username):
     filename = f'{username}_heart_rate_data.json'
@@ -16,30 +32,33 @@ def send_data_for_user(username):
     with open(filename, 'r') as f:
         data_entries = json.load(f)
 
-    print(f"Sending {len(data_entries)} heart rate entries for {username} to {API_ENDPOINT}...")
-    
-    successful_sends = 0
-    failed_sends = 0
+    if not data_entries:
+        print(f"No data to send for {username}.")
+        return
 
-    for entry in data_entries:
-        try:
-            response = requests.post(API_ENDPOINT, json=entry)
-            if response.status_code == 200:
-                successful_sends += 1
-                # print(f"Successfully sent: {entry['timestamp']}")
-            else:
-                failed_sends += 1
-                print(f"Failed to send entry at {entry['timestamp']}: Status Code {response.status_code}, Response: {response.text}")
-        except requests.exceptions.ConnectionError:
-            print(f"Connection Error: Could not connect to {API_ENDPOINT}. Is the server running?")
-            break # Stop trying to send if connection fails
-        except Exception as e:
-            failed_sends += 1
-            print(f"An unexpected error occurred: {e}")
-            
-    print(f"Finished sending data for {username}. Successful: {successful_sends}, Failed: {failed_sends}")
+    # Update timestamps to ensure they are new for each run
+    data_entries = update_timestamps(data_entries)
+
+    print(f"Sending {len(data_entries)} heart rate entries for {username} to {API_ENDPOINT}...")
+
+    # Convert list of dicts to a newline-delimited JSON string
+    ndjson_data = '\n'.join(json.dumps(entry) for entry in data_entries)
+
+    payload = {
+        "data": ndjson_data
+    }
+
+    try:
+        response = requests.post(API_ENDPOINT, json=payload)
+        if response.status_code in [200, 201]:
+            print(f"Successfully sent data for {username}. Response: {response.json()}")
+        else:
+            print(f"Failed to send data for {username}: Status Code {response.status_code}, Response: {response.text}")
+    except requests.exceptions.ConnectionError:
+        print(f"Connection Error: Could not connect to {API_ENDPOINT}. Is the server running?")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
     for user in USERS:
         send_data_for_user(user)
-
