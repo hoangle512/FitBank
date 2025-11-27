@@ -30,11 +30,12 @@ interface InsertPayload {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-
   try {
     const json = await request.json();
+    console.log("Raw JSON received:", JSON.stringify(json, null, 2));
+
     const parsedPayload = HeartRatePayloadSchema.safeParse(json);
+    console.log("Parsed Payload (after Zod safeParse):", JSON.stringify(parsedPayload, null, 2));
 
     if (!parsedPayload.success) {
       const validationError = fromZodError(parsedPayload.error);
@@ -44,31 +45,37 @@ export async function POST(request: Request) {
       );
     }
 
-      // Original logic for processing NDJSON
-      const incomingDataStrings = parsedPayload.data.data.trim().split('\n').filter(s => s !== '');
-    
-          const incomingData: HeartRateEntry[] = [];
-          for (const str of incomingDataStrings) {
-            try {
-              const entryJson = JSON.parse(str);
-              const validatedEntry = HeartRateDataSchema.parse(entryJson);
-              incomingData.push(validatedEntry);
-            } catch (e) {
-              console.warn('Skipping invalid heart rate data entry:', str, e);
-              return NextResponse.json(
-                { 
-                  error: 'Error processing heart rate data', 
-                  details: `JSON parse failed for entry: ${e instanceof Error ? e.message : 'Unknown error'}`,
-                  problematic_string: str 
-                },
-                { status: 500 }
-              );
-            }
-          }
+    const rawNdjsonString = parsedPayload.data.data;
+    console.log("Raw NDJSON string from payload:", rawNdjsonString);
+
+    const incomingDataStrings = rawNdjsonString.trim().split('\n').filter(s => s !== '');
+    console.log("Incoming Data Strings (after split and filter):", JSON.stringify(incomingDataStrings, null, 2));
+      
+    const incomingData: HeartRateEntry[] = [];
+    for (const str of incomingDataStrings) {
+      try {
+        console.log("Attempting to parse individual string:", str);
+        const entryJson = JSON.parse(str);
+        const validatedEntry = HeartRateDataSchema.parse(entryJson);
+        incomingData.push(validatedEntry);
+      } catch (e) {
+        console.warn('Skipping invalid heart rate data entry:', str, e);
+        return NextResponse.json(
+          {
+            error: 'Failed to process request (JSON parse error within NDJSON)', 
+            details: `JSON parse error on string: ${str} - ${e instanceof Error ? e.message : 'Unknown error'}`, 
+            problematic_string: str 
+          },
+          { status: 500 }
+        );
+      }
+    }
+
     if (incomingData.length === 0) {
       return NextResponse.json({ message: 'No valid data to process', records_processed: 0 });
     }
 
+    // --- The rest of the logic remains unchanged for now ---
     const { data: settingsData, error: settingsError } = await supabase
       .from('app_settings')
       .select('value, key');
@@ -198,9 +205,9 @@ export async function POST(request: Request) {
     );
 
   } catch (error) {
-    console.error('Error processing heart rate data:', error);
+    console.error('Outer error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to process request', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to process request (outer)', details: error instanceof Error ? error.message : 'Unknown outer error' },
       { status: 500 }
     );
   }
