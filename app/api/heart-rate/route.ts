@@ -47,17 +47,24 @@ export async function POST(request: Request) {
       // Original logic for processing NDJSON
       const incomingDataStrings = parsedPayload.data.data.trim().split('\n').filter(s => s !== '');
     
-    const incomingData: HeartRateEntry[] = [];
-    for (const str of incomingDataStrings) {
-      try {
-        const entryJson = JSON.parse(str);
-        const validatedEntry = HeartRateDataSchema.parse(entryJson);
-        incomingData.push(validatedEntry);
-      } catch (e) {
-        console.warn('Skipping invalid heart rate data entry:', str, e);
-      }
-    }
-
+          const incomingData: HeartRateEntry[] = [];
+          for (const str of incomingDataStrings) {
+            try {
+              const entryJson = JSON.parse(str);
+              const validatedEntry = HeartRateDataSchema.parse(entryJson);
+              incomingData.push(validatedEntry);
+            } catch (e) {
+              console.warn('Skipping invalid heart rate data entry:', str, e);
+              return NextResponse.json(
+                { 
+                  error: 'Error processing heart rate data', 
+                  details: `JSON parse failed for entry: ${e instanceof Error ? e.message : 'Unknown error'}`,
+                  problematic_string: str 
+                },
+                { status: 500 }
+              );
+            }
+          }
     if (incomingData.length === 0) {
       return NextResponse.json({ message: 'No valid data to process', records_processed: 0 });
     }
