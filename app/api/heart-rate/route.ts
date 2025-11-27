@@ -44,8 +44,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Split the NDJSON string into individual JSON strings
-    const incomingDataStrings = parsedPayload.data.data.replace(/\\n/g, '\n').trim().split('\n');
+    const incomingDataStrings = parsedPayload.data.data.trim().split('\n');
     
     const incomingData: HeartRateEntry[] = [];
     for (const str of incomingDataStrings) {
@@ -54,7 +53,6 @@ export async function POST(request: Request) {
         const validatedEntry = HeartRateDataSchema.parse(entryJson);
         incomingData.push(validatedEntry);
       } catch (e) {
-        // Handle cases where a line is not valid JSON or does not match the schema
         console.warn('Skipping invalid heart rate data entry:', str, e);
       }
     }
