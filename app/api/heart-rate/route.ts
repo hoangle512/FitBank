@@ -30,12 +30,14 @@ interface InsertPayload {
 }
 
 export async function POST(request: Request) {
+  const supabase = await createClient(); // Moved here to ensure scope
+
   try {
     const json = await request.json();
-    console.log("Raw JSON received:", JSON.stringify(json, null, 2));
+    // console.log("Raw JSON received:", JSON.stringify(json, null, 2));
 
     const parsedPayload = HeartRatePayloadSchema.safeParse(json);
-    console.log("Parsed Payload (after Zod safeParse):", JSON.stringify(parsedPayload, null, 2));
+    // console.log("Parsed Payload (after Zod safeParse):", JSON.stringify(parsedPayload, null, 2));
 
     if (!parsedPayload.success) {
       const validationError = fromZodError(parsedPayload.error);
@@ -46,15 +48,15 @@ export async function POST(request: Request) {
     }
 
     const rawNdjsonString = parsedPayload.data.data;
-    console.log("Raw NDJSON string from payload:", rawNdjsonString);
+    // console.log("Raw NDJSON string from payload:", rawNdjsonString);
 
     const incomingDataStrings = rawNdjsonString.trim().split('\n').filter(s => s !== '');
-    console.log("Incoming Data Strings (after split and filter):", JSON.stringify(incomingDataStrings, null, 2));
+    // console.log("Incoming Data Strings (after split and filter):", JSON.stringify(incomingDataStrings, null, 2));
       
     const incomingData: HeartRateEntry[] = [];
     for (const str of incomingDataStrings) {
       try {
-        console.log("Attempting to parse individual string:", str);
+        // console.log("Attempting to parse individual string:", str);
         const entryJson = JSON.parse(str);
         const validatedEntry = HeartRateDataSchema.parse(entryJson);
         incomingData.push(validatedEntry);
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error: 'Failed to process request (JSON parse error within NDJSON)', 
-            details: `JSON parse error on string: ${str} - ${e instanceof Error ? e.message : 'Unknown error'}`, 
+            details: `JSON parse error on string: ${str} - ${e instanceof Error ? e.message : 'Unknown error'}`,
             problematic_string: str 
           },
           { status: 500 }
@@ -207,7 +209,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Outer error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to process request (outer)', details: error instanceof Error ? error.message : 'Unknown outer error' },
+      { error: 'Failed to process request (outer)', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
