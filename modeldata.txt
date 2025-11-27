@@ -1,0 +1,13 @@
+{
+  "name": "Example Model",
+  "version": "1.0.0",
+  "description": "This is an example of a correctly formatted JSON object.",
+  "data": [
+    {"id": 1, "value": "alpha"},
+    {"id": 2, "value": "beta"}
+  ],
+  "settings": {
+    "enabled": true,
+    "max_items": 10
+  }
+}

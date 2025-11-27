@@ -1,23 +1,32 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Make sure this path is correct
+import { createClient } from '@/lib/supabase/server';
 import { calculatePointsForBpm } from '../../../lib/scoring';
 import { z } from 'zod';
+import { fromZodError } from 'zod-validation-error';
 
-// Define the expected data structure
+// Define the expected data structure for a single entry
 const HeartRateDataSchema = z.object({
   bpm: z.number().int(),
-  timestamp: z.string().datetime(),
+  timestamp: z.string().datetime({ offset: true }),
   username: z.string().min(1),
 });
 
+// The payload now expects a 'data' field that is a string (NDJSON)
 const HeartRatePayloadSchema = z.object({
-  data: z.array(HeartRateDataSchema),
+  data: z.string(),
 });
 
 interface HeartRateEntry {
   bpm: number;
   timestamp: string;
   username: string;
+}
+
+interface InsertPayload {
+  username: string;
+  bpm: number;
+  timestamp: string;
+  points: number;
 }
 
 export async function POST(request: Request) {
@@ -28,10 +37,30 @@ export async function POST(request: Request) {
     const parsedPayload = HeartRatePayloadSchema.safeParse(json);
 
     if (!parsedPayload.success) {
+      const validationError = fromZodError(parsedPayload.error);
       return NextResponse.json(
-        { error: 'Invalid request data', details: parsedPayload.error.errors },
+        { error: 'Invalid request data', details: validationError.toString() },
         { status: 400 }
       );
+    }
+
+    // Split the NDJSON string into individual JSON strings
+    const incomingDataStrings = parsedPayload.data.data.trim().split('\n');
+    
+    const incomingData: HeartRateEntry[] = [];
+    for (const str of incomingDataStrings) {
+      try {
+        const entryJson = JSON.parse(str);
+        const validatedEntry = HeartRateDataSchema.parse(entryJson);
+        incomingData.push(validatedEntry);
+      } catch (e) {
+        // Handle cases where a line is not valid JSON or does not match the schema
+        console.warn('Skipping invalid heart rate data entry:', str, e);
+      }
+    }
+
+    if (incomingData.length === 0) {
+      return NextResponse.json({ message: 'No valid data to process', records_processed: 0 });
     }
 
     const { data: settingsData, error: settingsError } = await supabase
@@ -51,26 +80,17 @@ export async function POST(request: Request) {
     const z1 = parseInt(settings.z1 || "125", 10);
     const z2 = parseInt(settings.z2 || "150", 10);
     const z3 = parseInt(settings.z3 || "165", 10);
-    const incomingData = parsedPayload.data.data;
     const uniqueUsernames = [...new Set(incomingData.map((d) => d.username))];
 
     // 1. Fetch latest timestamps for these users from Supabase
-    // We use a raw RPC call or a specific query to get max timestamp per user.
-    // Since Supabase simple client doesn't do "GROUP BY" easily on SELECT, 
-    // we will fetch the latest record for each user.
-    
     const latestTimestampMap = new Map<string, number>();
     
-    // Note: For efficiency in production, you might want a separate 'user_stats' table 
-    // that tracks the last_sync_timestamp, but this works for now.
     const { data: existingLatest } = await supabase
       .from('heart_rate_data')
       .select('username, timestamp')
       .in('username', uniqueUsernames)
       .order('timestamp', { ascending: false });
 
-    // Process the list to find the absolute latest per user (since the query returns all rows)
-    // A better way in raw SQL is simpler, but with JS client:
     if (existingLatest) {
       for (const row of existingLatest) {
         if (!latestTimestampMap.has(row.username)) {
@@ -82,6 +102,7 @@ export async function POST(request: Request) {
     // 2. Filter out data that is already in the DB
     const newRecordsToProcess = incomingData.filter((entry) => {
       const latestTime = latestTimestampMap.get(entry.username);
+      console.log(`User: ${entry.username}, Latest Time in DB: ${latestTime}, Entry Time: ${new Date(entry.timestamp).getTime()}`);
       if (!latestTime) return true; // New user
       return new Date(entry.timestamp).getTime() > latestTime;
     });
@@ -90,7 +111,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No new data to process', records_processed: 0 });
     }
 
-    // 3. CRITICAL FIX: Group data by User BEFORE interpolating
+    // 3. Group data by User BEFORE interpolating
     const recordsByUser: Record<string, HeartRateEntry[]> = {};
     
     newRecordsToProcess.forEach((record) => {
@@ -98,11 +119,10 @@ export async function POST(request: Request) {
       recordsByUser[record.username].push(record);
     });
 
-    const finalInsertPayload: any[] = [];
+    const finalInsertPayload: InsertPayload[] = [];
 
     // 4. Process each user separately
     for (const username of Object.keys(recordsByUser)) {
-      // Sort this specific user's data chronologically
       const userEntries = recordsByUser[username].sort(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
@@ -116,10 +136,9 @@ export async function POST(request: Request) {
           const prevTimestamp = new Date(previousEntry.timestamp);
           const timeDiff = currentTimestamp.getTime() - prevTimestamp.getTime();
 
-          // Interpolation Logic
           const minuteIterator = new Date(prevTimestamp);
           minuteIterator.setSeconds(0, 0);
-          minuteIterator.setMinutes(minuteIterator.getMinutes() + 1); // Move to next full minute
+          minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
 
           const currentMinuteStart = new Date(currentTimestamp);
           currentMinuteStart.setSeconds(0, 0);
@@ -144,7 +163,6 @@ export async function POST(request: Request) {
           }
         }
 
-        // Add the actual current entry
         finalInsertPayload.push({
           username: username,
           bpm: currentEntry.bpm,
