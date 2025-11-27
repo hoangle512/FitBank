@@ -44,7 +44,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const incomingDataStrings = parsedPayload.data.data.trim().split('\n');
+      // Original logic for processing NDJSON
+      const incomingDataStrings = parsedPayload.data.data.trim().split('\n').filter(s => s !== '');
     
     const incomingData: HeartRateEntry[] = [];
     for (const str of incomingDataStrings) {
