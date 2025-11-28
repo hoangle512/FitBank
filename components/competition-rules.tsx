@@ -47,9 +47,20 @@ export function CompetitionRules() {
               Points are awarded based on heart rate readings. Consistent monitoring and achieving target zones will earn you more points: 
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Zone 1: <strong>{settings?.z1 ?? "..."} points</strong></li>
-              <li>Zone 2: <strong>{settings?.z2 ?? "..."} points</strong></li>
-              <li>Zone 3: <strong>{settings?.z3 ?? "..."} points</strong></li>
+              {settings && (
+                <>
+                  <li>Zone 1: <strong>{settings.z1}-{parseInt(settings.z2) - 1} BPM = 1 point</strong></li>
+                  <li>Zone 2: <strong>{settings.z2}-{parseInt(settings.z3) - 1} BPM = 2 points</strong></li>
+                  <li>Zone 3: <strong>{settings.z3}+ BPM = 3 points</strong></li>
+                </>
+              )}
+              {!settings && (
+                <>
+                  <li>Zone 1: <strong>...-... BPM = 1 point</strong></li>
+                  <li>Zone 2: <strong>...-... BPM = 2 points</strong></li>
+                  <li>Zone 3: <strong>...+ BPM = 3 points</strong></li>
+                </>
+              )}
             </ul>
           </div>
           <div>
