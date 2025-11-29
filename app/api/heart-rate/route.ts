@@ -11,8 +11,12 @@ const HeartRateDataSchema = z.object({
   username: z.string().min(1),
 });
 
-// The payload now expects a JSON array of HeartRateDataSchema
-const HeartRatePayloadSchema = z.array(HeartRateDataSchema);
+// The payload now expects a single object with parallel arrays for timestamp and bpm
+const IncomingHeartRateSchema = z.object({
+  username: z.string().min(1),
+  timestamp: z.array(z.string().datetime({ offset: true })),
+  bpm: z.array(z.number().int()),
+});
 
 interface HeartRateEntry {
   bpm: number;
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
       throw e; // Re-throw other errors to be caught by the outer catch
     }
 
-    const parsedPayload = HeartRatePayloadSchema.safeParse(json);
+    const parsedPayload = IncomingHeartRateSchema.safeParse(json);
 
     if (!parsedPayload.success) {
       const validationError = fromZodError(parsedPayload.error);
@@ -56,8 +60,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const incomingData: HeartRateEntry[] = parsedPayload.data;
-    console.log("Incoming Data (parsed as array):", JSON.stringify(incomingData, null, 2));
+    const { username, timestamp: timestamps, bpm: bpms } = parsedPayload.data;
+
+    if (timestamps.length !== bpms.length) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: 'Timestamp and BPM arrays must have the same length.' },
+        { status: 400 }
+      );
+    }
+
+    const incomingData: HeartRateEntry[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      incomingData.push({
+        username,
+        timestamp: timestamps[i],
+        bpm: bpms[i],
+      });
+    }
+
+    console.log("Incoming Data (transformed from parallel arrays):", JSON.stringify(incomingData, null, 2));
 
     if (incomingData.length === 0) {
       return NextResponse.json({ message: 'No valid data to process', records_processed: 0 });
