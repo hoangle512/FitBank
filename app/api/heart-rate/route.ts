@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Filter out data that is already in the DB
-    const newRecordsToProcess = incomingData.filter((entry) => {
+    let newRecordsToProcess = incomingData.filter((entry) => {
       const latestTime = latestTimestampMap.get(entry.username);
       console.log(`User: ${entry.username}, Latest Time in DB: ${latestTime}, Entry Time: ${new Date(entry.timestamp).getTime()}`);
       if (!latestTime) return true; // New user
