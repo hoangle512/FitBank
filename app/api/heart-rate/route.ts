@@ -112,6 +112,52 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No new data to process', records_processed: 0 });
     }
 
+    // New logic: Calculate average BPM per minute
+    const minuteBpmAggregates = new Map<string, Map<string, { sumBpm: number; count: number; firstTimestamp: string }>>();
+
+    for (const entry of newRecordsToProcess) {
+      const date = new Date(entry.timestamp);
+      // Normalize timestamp to the start of the minute
+      date.setSeconds(0, 0);
+      const minuteTimestampString = date.toISOString();
+
+      if (!minuteBpmAggregates.has(entry.username)) {
+        minuteBpmAggregates.set(entry.username, new Map());
+      }
+      const userMinuteMap = minuteBpmAggregates.get(entry.username)!;
+
+      if (!userMinuteMap.has(minuteTimestampString)) {
+        userMinuteMap.set(minuteTimestampString, { sumBpm: 0, count: 0, firstTimestamp: entry.timestamp });
+      }
+      const minuteAggregate = userMinuteMap.get(minuteTimestampString)!;
+      minuteAggregate.sumBpm += entry.bpm;
+      minuteAggregate.count += 1;
+      // Keep the earliest timestamp for the minute to maintain accuracy if original timestamps within a minute vary
+      if (new Date(entry.timestamp).getTime() < new Date(minuteAggregate.firstTimestamp).getTime()) {
+        minuteAggregate.firstTimestamp = entry.timestamp;
+      }
+    }
+
+    const processedMinuteEntries: HeartRateEntry[] = [];
+    for (const [username, userMinuteMap] of minuteBpmAggregates.entries()) {
+      for (const [minuteTimestampString, aggregate] of userMinuteMap.entries()) {
+        const averageBpm = Math.round(aggregate.sumBpm / aggregate.count);
+        processedMinuteEntries.push({
+          username: username,
+          bpm: averageBpm,
+          timestamp: aggregate.firstTimestamp, // Use the earliest timestamp from the minute
+        });
+      }
+    }
+
+    // Replace newRecordsToProcess with the minute-averaged entries
+    newRecordsToProcess = processedMinuteEntries;
+    
+    if (newRecordsToProcess.length === 0) { // Check again after processing
+      return NextResponse.json({ message: 'No new data to process after averaging', records_processed: 0 });
+    }
+
+
     // 3. Group data by User BEFORE interpolating
     const recordsByUser: Record<string, HeartRateEntry[]> = {};
     
