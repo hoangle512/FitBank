@@ -235,30 +235,33 @@ export async function POST(request: Request) {
           const prevTimestamp = new Date(previousEntry.timestamp);
           const timeDiff = currentTimestamp.getTime() - prevTimestamp.getTime();
 
-          const minuteIterator = new Date(prevTimestamp);
-          minuteIterator.setSeconds(0, 0);
-          minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
-
-          const currentMinuteStart = new Date(currentTimestamp);
-          currentMinuteStart.setSeconds(0, 0);
-
-          while (minuteIterator.getTime() < currentMinuteStart.getTime()) {
-            let factor = 0;
-            if (timeDiff > 0) {
-              factor = (minuteIterator.getTime() - prevTimestamp.getTime()) / timeDiff;
-            }
-            const interpolatedBpm = Math.round(
-              previousEntry.bpm + factor * (currentEntry.bpm - previousEntry.bpm)
-            );
-
-            finalInsertPayload.push({
-              username: username,
-              bpm: interpolatedBpm,
-              timestamp: minuteIterator.toISOString(),
-              points: calculatePointsForBpm(interpolatedBpm, z1, z2, z3),
-            });
-
+          // Only interpolate if the time difference is less than or equal to 5 minutes
+          if (timeDiff <= 5 * 60 * 1000) {
+            const minuteIterator = new Date(prevTimestamp);
+            minuteIterator.setSeconds(0, 0);
             minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+
+            const currentMinuteStart = new Date(currentTimestamp);
+            currentMinuteStart.setSeconds(0, 0);
+
+            while (minuteIterator.getTime() < currentMinuteStart.getTime()) {
+              let factor = 0;
+              if (timeDiff > 0) {
+                factor = (minuteIterator.getTime() - prevTimestamp.getTime()) / timeDiff;
+              }
+              const interpolatedBpm = Math.round(
+                previousEntry.bpm + factor * (currentEntry.bpm - previousEntry.bpm)
+              );
+
+              finalInsertPayload.push({
+                username: username,
+                bpm: interpolatedBpm,
+                timestamp: minuteIterator.toISOString(),
+                points: calculatePointsForBpm(interpolatedBpm, z1, z2, z3),
+              });
+
+              minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
+            }
           }
         }
 

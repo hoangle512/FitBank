@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 # Configuration
-API_ENDPOINT = "http://localhost:3000/api/heart-rate"
+API_ENDPOINT = "https://fit-bank-wb44.vercel.app/api/heart-rate"
 USERS = ['user_a', 'user_b', 'user_c']
 
 def update_timestamps(entries):
@@ -41,11 +41,15 @@ def send_data_for_user(username):
 
     print(f"Sending {len(data_entries)} heart rate entries for {username} to {API_ENDPOINT}...")
 
-    # Convert list of dicts to a newline-delimited JSON string
-    ndjson_data = '\n'.join(json.dumps(entry) for entry in data_entries)
+    # Separate bpm and timestamp values and join them with newline characters
+    bpm_string = '\n'.join([str(entry['bpm']) for entry in data_entries])
+    timestamp_string = '\n'.join([entry['timestamp'] for entry in data_entries])
+    username = data_entries[0]['username'] # Assuming username is consistent across entries
 
     payload = {
-        "data": ndjson_data
+        "bpm": bpm_string,
+        "username": username,
+        "timestamp": timestamp_string
     }
 
     try:
