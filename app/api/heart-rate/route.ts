@@ -66,11 +66,15 @@ export async function POST(request: Request) {
 
     const timestamps = timestampString.split('\n').map((s) => s.trim()).filter(Boolean);
     const bpms = bpmString.split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
+    
+    console.log("Parsed timestamps:", JSON.stringify(timestamps, null, 2));
+    console.log("Parsed bpms:", JSON.stringify(bpms, null, 2));
 
     const revalidatedPayload = ValidatedHeartRateData.safeParse({ username, timestamp: timestamps, bpm: bpms });
 
     if (!revalidatedPayload.success) {
       const validationError = fromZodError(revalidatedPayload.error);
+      console.error("Revalidation failed:", validationError.toString());
       return NextResponse.json(
         { error: 'Invalid parsed data', details: validationError.toString() },
         { status: 400 }
