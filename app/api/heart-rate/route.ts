@@ -4,15 +4,17 @@ import { calculatePointsForBpm } from '../../../lib/scoring';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-// Define the expected data structure for a single entry
-const HeartRateDataSchema = z.object({
-  bpm: z.number().int(),
-  timestamp: z.string().datetime({ offset: true }),
-  username: z.string().min(1),
-});
+
 
 // The payload now expects a single object with parallel arrays for timestamp and bpm
 const IncomingHeartRateSchema = z.object({
+  username: z.string().min(1),
+  timestamp: z.string(),
+  bpm: z.string(),
+});
+
+// Schema for the arrays after parsing the incoming strings
+const ValidatedHeartRateData = z.object({
   username: z.string().min(1),
   timestamp: z.array(z.string().datetime({ offset: true })),
   bpm: z.array(z.number().int()),
@@ -35,12 +37,12 @@ export async function POST(request: Request) {
   const supabase = await createClient();
 
   try {
-    let json: any;
+    let json: unknown;
 
     try {
       json = await request.json();
       console.log("Raw JSON received:", JSON.stringify(json, null, 2));
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof SyntaxError && e.message.includes('JSON')) {
         return NextResponse.json(
           { error: 'Invalid JSON payload', details: e.message },
@@ -50,31 +52,46 @@ export async function POST(request: Request) {
       throw e; // Re-throw other errors to be caught by the outer catch
     }
 
-    const parsedPayload = IncomingHeartRateSchema.safeParse(json);
+    const initialParse = IncomingHeartRateSchema.safeParse(json);
 
-    if (!parsedPayload.success) {
-      const validationError = fromZodError(parsedPayload.error);
+    if (!initialParse.success) {
+      const validationError = fromZodError(initialParse.error);
       return NextResponse.json(
         { error: 'Invalid request data', details: validationError.toString() },
         { status: 400 }
       );
     }
 
-    const { username, timestamp: timestamps, bpm: bpms } = parsedPayload.data;
+    const { username, timestamp: timestampString, bpm: bpmString } = initialParse.data;
 
-    if (timestamps.length !== bpms.length) {
+    const timestamps = timestampString.split('\n').map((s) => s.trim()).filter(Boolean);
+    const bpms = bpmString.split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
+
+    const revalidatedPayload = ValidatedHeartRateData.safeParse({ username, timestamp: timestamps, bpm: bpms });
+
+    if (!revalidatedPayload.success) {
+      const validationError = fromZodError(revalidatedPayload.error);
       return NextResponse.json(
-        { error: 'Invalid request data', details: 'Timestamp and BPM arrays must have the same length.' },
+        { error: 'Invalid parsed data', details: validationError.toString() },
+        { status: 400 }
+      );
+    }
+
+    const { timestamp: validatedTimestamps, bpm: validatedBpms } = revalidatedPayload.data;
+
+    if (validatedTimestamps.length !== validatedBpms.length) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: 'Timestamp and BPM arrays must have the same length after parsing.' },
         { status: 400 }
       );
     }
 
     const incomingData: HeartRateEntry[] = [];
-    for (let i = 0; i < timestamps.length; i++) {
+    for (let i = 0; i < validatedTimestamps.length; i++) {
       incomingData.push({
         username,
-        timestamp: timestamps[i],
-        bpm: bpms[i],
+        timestamp: validatedTimestamps[i],
+        bpm: validatedBpms[i],
       });
     }
 
@@ -161,7 +178,7 @@ export async function POST(request: Request) {
 
     const processedMinuteEntries: HeartRateEntry[] = [];
     for (const [username, userMinuteMap] of minuteBpmAggregates.entries()) {
-      for (const [minuteTimestampString, aggregate] of userMinuteMap.entries()) {
+      for (const [_currentMinuteTimestampString, aggregate] of userMinuteMap.entries()) {
         const averageBpm = Math.round(aggregate.sumBpm / aggregate.count);
         processedMinuteEntries.push({
           username: username,
@@ -259,7 +276,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Outer error processing heart rate data:', error);
     return NextResponse.json(
       { error: 'Failed to process request (outer)', details: error instanceof Error ? error.message : 'Unknown error' },
