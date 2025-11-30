@@ -67,8 +67,12 @@ export async function POST(request: Request) {
     const timestamps = timestampString.split('\n').map((s) => s.trim()).filter(Boolean);
     const bpms = bpmString.split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
     
-    console.log("Parsed timestamps:", JSON.stringify(timestamps, null, 2));
-    console.log("Parsed bpms:", JSON.stringify(bpms, null, 2));
+    if (bpms.some(isNaN)) {
+      return NextResponse.json(
+        { error: 'Invalid BPM data', details: 'One or more BPM values are not valid numbers.' },
+        { status: 400 }
+      );
+    }
 
     const revalidatedPayload = ValidatedHeartRateData.safeParse({ username, timestamp: timestamps, bpm: bpms });
 
