@@ -70,6 +70,9 @@ export async function POST(request: Request) {
     const timestamps = timestampString.split('\n').map((s) => s.trim()).filter(Boolean);
     const bpms = bpmString.split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
     
+    console.log("Timestamps array after split and filter:", JSON.stringify(timestamps, null, 2));
+    console.log("BPMs array after split and filter:", JSON.stringify(bpms, null, 2));
+    
     if (bpms.some(isNaN)) {
       return NextResponse.json(
         { error: 'Invalid BPM data', details: 'One or more BPM values are not valid numbers.' },
