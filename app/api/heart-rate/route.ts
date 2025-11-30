@@ -17,7 +17,7 @@ const IncomingHeartRateSchema = z.object({
 const ValidatedHeartRateData = z.object({
   username: z.string().min(1),
   timestamp: z.array(z.string().datetime({ offset: true })),
-  bpm: z.array(z.number().int()),
+  bpm: z.array(z.number()),
 });
 
 interface HeartRateEntry {
