@@ -63,6 +63,9 @@ export async function POST(request: Request) {
     }
 
     const { username, timestamp: timestampString, bpm: bpmString } = initialParse.data;
+    
+    console.log("Type of timestampString:", typeof timestampString);
+    console.log("Type of bpmString:", typeof bpmString);
 
     const timestamps = timestampString.split('\n').map((s) => s.trim()).filter(Boolean);
     const bpms = bpmString.split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
