@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     try {
       json = await request.json();
-      console.log("Raw JSON received:", JSON.stringify(json, null, 2));
+
     } catch (e: unknown) {
       if (e instanceof SyntaxError && e.message.includes('JSON')) {
         return NextResponse.json(
