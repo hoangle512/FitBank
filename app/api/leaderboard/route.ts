@@ -56,12 +56,17 @@ export async function GET() {
       user = {
         username: curr.username,
         total_points: 0,
+        minutes: 0,
 
       }
       acc.set(curr.username, user)
     }
 
     user.total_points += curr.points || 0
+
+    if (typeof curr.bpm === 'number') { // Increment for every BPM entry
+      user.minutes += 1
+    }
 
 
     user.max_bpm = Math.max(user.max_bpm, curr.bpm || 0)
@@ -88,6 +93,7 @@ export async function GET() {
       id: user.id, // Use the actual user ID from the users table
       username: user.display_name || user.id, // Display name as username, fallback to id
       total_points: hrData?.total_points || 0,
+      minutes: hrData?.minutes || 0,
 
 
       max_bpm: hrData?.max_bpm || 0,
