@@ -56,20 +56,14 @@ export async function GET() {
       user = {
         username: curr.username,
         total_points: 0,
-        minutes: 0,
-        avg_bpm: 0,
-        max_bpm: 0,
-        total_bpm_for_avg: 0,
+
       }
       acc.set(curr.username, user)
     }
 
     user.total_points += curr.points || 0
-    if (curr.points && curr.points > 0) {
-      user.minutes += 1
-    }
-    user.total_bpm_for_avg += curr.bpm || 0
-    user.avg_bpm = Math.round(user.total_bpm_for_avg / user.minutes)
+
+
     user.max_bpm = Math.max(user.max_bpm, curr.bpm || 0)
     
     return acc
@@ -94,8 +88,8 @@ export async function GET() {
       id: user.id, // Use the actual user ID from the users table
       username: user.display_name || user.id, // Display name as username, fallback to id
       total_points: hrData?.total_points || 0,
-      minutes: hrData?.minutes || 0,
-      avg_bpm: hrData?.avg_bpm || 0,
+
+
       max_bpm: hrData?.max_bpm || 0,
       coins: stats?.coins || 0,
       fails: stats?.fails || 0,
