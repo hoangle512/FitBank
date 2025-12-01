@@ -26,6 +26,7 @@ export async function GET() {
     z3: "165",
     start_date: new Date().toISOString().split('T')[0], // Today's date
     end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+    prize_pool_adjustment: "0",
   };
 
   // Merge fetched settings with defaults, prioritizing fetched settings
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
   try {
 
-    const { competition_name, target_points, z1, z2, z3, start_date, end_date } = await request.json();
+    const { competition_name, target_points, z1, z2, z3, start_date, end_date, prize_pool_adjustment } = await request.json();
 
 
 
@@ -61,6 +62,8 @@ export async function POST(request: Request) {
       { key: 'start_date', value: start_date },
 
       { key: 'end_date', value: end_date },
+
+      { key: 'prize_pool_adjustment', value: prize_pool_adjustment?.toString() },
 
     ];
 

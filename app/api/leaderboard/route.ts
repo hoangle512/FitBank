@@ -28,53 +28,55 @@ export async function GET() {
     // Or handle this error more strictly if RPC failure should halt leaderboard display
   }
 
-  // Get aggregated heart rate data
-  // Calculate the start of the current week (Monday)
-  const now = new Date();
-  const day = now.getDay(); // 0 for Sunday, 1 for Monday
-  // Adjust to the most recent Monday. If today is Monday, it will be today's Monday.
-  // If today is Sunday, it will go back to the previous Monday.
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const startOfWeek = new Date(now.setDate(diff));
-  startOfWeek.setHours(0, 0, 0, 0); // Set to the very beginning of Monday
-  const startOfWeekISO = startOfWeek.toISOString(); // Format for Supabase filter
+  // Fetch all users first to ensure everyone is on the leaderboard
+  const { data: users, error: usersError } = await supabase
+    .from("users")
+    .select("username, display_name")
+
+  if (usersError) {
+    return NextResponse.json({ error: usersError.message }, { status: 500 })
+  }
+
+  // Get aggregated heart rate data for the current week
+  const now = new Date()
+  const day = now.getDay()
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+  const startOfWeek = new Date(now.setDate(diff))
+  startOfWeek.setHours(0, 0, 0, 0)
+  const startOfWeekISO = startOfWeek.toISOString()
 
   const { data: heartRateData, error: heartRateError } = await supabase
     .from("heart_rate_data")
     .select("username, points, bpm")
-    .gte('timestamp', startOfWeekISO) // Filter for current week
-    .order("points", { ascending: false })
+    .gte('timestamp', startOfWeekISO)
 
   if (heartRateError) {
     return NextResponse.json({ error: heartRateError.message }, { status: 500 })
   }
 
   // Aggregate heart rate data by username
-  interface AggregatedHeartRate {
-    username: string;
-    total_points: number;
-    readings: number;
-    avg_bpm: number;
-    max_bpm: number;
-  }
   const aggregatedHeartRate = heartRateData.reduce((acc, curr) => {
-    const existing = acc.find((item) => item.username === curr.username)
-    if (existing) {
-      existing.total_points += curr.points || 0
-      existing.readings += 1
-      existing.avg_bpm = Math.round((existing.avg_bpm * (existing.readings - 1) + (curr.bpm || 0)) / existing.readings)
-      existing.max_bpm = Math.max(existing.max_bpm, curr.bpm || 0)
-    } else {
-      acc.push({
+    let user = acc.get(curr.username)
+    if (!user) {
+      user = {
         username: curr.username,
-        total_points: curr.points || 0,
-        readings: 1,
-        avg_bpm: curr.bpm || 0,
-        max_bpm: curr.bpm || 0,
-      })
+        total_points: 0,
+        minutes: 0, // This is the total number of entries
+        avg_bpm: 0,
+        max_bpm: 0,
+        total_bpm_for_avg: 0, // Helper for calculating running average
+      }
+      acc.set(curr.username, user)
     }
+
+    user.total_points += curr.points || 0
+    user.minutes += 1
+    user.total_bpm_for_avg += curr.bpm || 0
+    user.avg_bpm = Math.round(user.total_bpm_for_avg / user.minutes)
+    user.max_bpm = Math.max(user.max_bpm, curr.bpm || 0)
+    
     return acc
-  }, [] as AggregatedHeartRate[])
+  }, new Map())
 
   // Fetch coins and fails from leaderboard_stats
   const { data: leaderboardStats, error: leaderboardStatsError } = await supabase
@@ -82,26 +84,34 @@ export async function GET() {
     .select("username, coins, fails")
 
   if (leaderboardStatsError) {
-    console.error("Error fetching leaderboard_stats:", leaderboardStatsError);
-    // Decide how to handle this error: return partial data, or an error response
-    // For now, we'll proceed and merge what we have, possibly leaving coins/fails as undefined
+    console.error("Error fetching leaderboard_stats:", leaderboardStatsError)
+    // Continue, will merge what we have
   }
+  
+  // Create a map for quick lookup
+  const statsMap = new Map(leaderboardStats?.map(item => [item.username, { coins: item.coins, fails: item.fails }]))
 
-  // Merge aggregated heart rate data with leaderboard stats
-  const finalLeaderboard = aggregatedHeartRate.map(hrEntry => {
-    const stats = leaderboardStats?.find(lsEntry => lsEntry.username === hrEntry.username);
+  // Merge all data together, starting with the full user list
+  const finalLeaderboard = users.map(user => {
+    const hrData = aggregatedHeartRate.get(user.username)
+    const stats = statsMap.get(user.username)
+    
     return {
-      ...hrEntry,
+      username: user.display_name || user.username,
+      total_points: hrData?.total_points || 0,
+      minutes: hrData?.minutes || 0,
+      avg_bpm: hrData?.avg_bpm || 0,
+      max_bpm: hrData?.max_bpm || 0,
       coins: stats?.coins || 0,
       fails: stats?.fails || 0,
-    };
-  });
+    }
+  })
 
   // Sort by total points
   finalLeaderboard.sort((a, b) => b.total_points - a.total_points)
 
   // Calculate total fails for the prize pool
-  const totalFails = leaderboardStats?.reduce((sum, entry) => sum + (entry.fails || 0), 0) || 0;
+  const totalFails = leaderboardStats?.reduce((sum, entry) => sum + (entry.fails || 0), 0) || 0
 
   return NextResponse.json({ leaderboard: finalLeaderboard, total_fails: totalFails })
 }
