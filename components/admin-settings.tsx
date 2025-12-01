@@ -23,7 +23,7 @@ export function AdminSettings() {
   const [startDate, setStartDate] = useState("")
       const [endDate, setEndDate] = useState("")
       const [prizePoolAdjustment, setPrizePoolAdjustment] = useState("0")
-      const [users, setUsers] = useState<{ username: string, display_name: string | null }[]>([])
+      const [users, setUsers] = useState<{ id: string, display_name: string | null }[]>([])
       
       const { toast } = useToast()
     
@@ -82,10 +82,10 @@ export function AdminSettings() {
         setPassword("")
       }
     
-      const handleUserAliasChange = (username: string, newAlias: string) => {
+      const handleUserAliasChange = (id: string, newAlias: string) => {
         setUsers(currentUsers =>
           currentUsers.map(u =>
-            u.username === username ? { ...u, display_name: newAlias } : u
+            u.id === id ? { ...u, display_name: newAlias } : u
           )
         );
       };
@@ -105,7 +105,7 @@ export function AdminSettings() {
           };
     
           const usersPayload = {
-            users: users.map(u => ({ username: u.username, display_name: u.display_name })),
+            users: users.map(u => ({ id: u.id, display_name: u.display_name })),
           };
     
           // Perform both API calls
@@ -222,11 +222,11 @@ export function AdminSettings() {
                 <h3 className="text-lg font-medium">User Aliases</h3>
                 <div className="space-y-2">
                   {users.map((user) => (
-                    <div key={user.username} className="grid grid-cols-2 gap-4 items-center">
-                      <Label>{user.username}</Label>
+                    <div key={user.id} className="grid grid-cols-2 gap-4 items-center">
+                      <Label>{user.id}</Label>
                       <Input
                         value={user.display_name || ''}
-                        onChange={(e) => handleUserAliasChange(user.username, e.target.value)}
+                        onChange={(e) => handleUserAliasChange(user.id, e.target.value)}
                         placeholder="Set display name"
                       />
                     </div>

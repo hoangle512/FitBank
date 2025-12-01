@@ -42,3 +42,4 @@ describe('Heart Rate API', () => {
     expect(responseBody.records_processed).toBe(1);
   });
 });
+

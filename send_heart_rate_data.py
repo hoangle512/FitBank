@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 # Configuration
-API_ENDPOINT = "https://fit-bank-wb44.vercel.app/api/heart-rate"
+API_ENDPOINT = "http://localhost:3000/api/heart-rate"
 USERS = ['user_a', 'user_b', 'user_c']
 
 def update_timestamps(entries):

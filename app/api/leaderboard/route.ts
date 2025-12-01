@@ -65,7 +65,9 @@ export async function GET() {
     }
 
     user.total_points += curr.points || 0
-    user.minutes += 1
+    if (curr.points && curr.points > 0) {
+      user.minutes += 1
+    }
     user.total_bpm_for_avg += curr.bpm || 0
     user.avg_bpm = Math.round(user.total_bpm_for_avg / user.minutes)
     user.max_bpm = Math.max(user.max_bpm, curr.bpm || 0)

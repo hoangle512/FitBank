@@ -283,6 +283,22 @@ export async function POST(request: Request) {
         .insert(finalInsertPayload);
 
       if (error) throw error;
+
+      // New logic: After successful heart rate data import, ensure users are in the 'users' table
+      const uniqueUsernamesFromPayload = [...new Set(finalInsertPayload.map(entry => entry.username))];
+      
+      const usersToUpsert = uniqueUsernamesFromPayload.map(username => ({
+        id: username,
+        display_name: username, // Initialize display_name with username
+      }));
+
+      const { error: upsertError } = await supabase
+        .from('users')
+        .upsert(usersToUpsert, { onConflict: 'id', ignoreDuplicates: true });
+
+      if (upsertError) {
+        console.error("Error upserting users after heart rate import:", upsertError);
+      }
     }
 
     return NextResponse.json(

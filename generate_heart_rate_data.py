@@ -39,8 +39,8 @@ def generate_user_data(username, start_date, end_date, z1, z2, z3):
     return user_data
 
 # Define parameters
-start_date = datetime.date(2025, 10, 22)
-end_date = datetime.date(2025, 11, 21)
+start_date = datetime.date(2025, 12, 1)
+end_date = datetime.date(2025, 12, 7)
 z1_val = 120
 z2_val = 145
 z3_val = 160
