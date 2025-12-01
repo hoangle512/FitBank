@@ -6,9 +6,10 @@ export async function GET() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('users')
-    .select('username, display_name');
+    .select('id, display_name');
 
   if (error) {
+    console.error("Supabase users fetch error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       supabase
         .from('users')
         .update({ display_name: user.display_name })
-        .eq('username', user.username)
+        .eq('id', user.username) // Assuming user.username from payload refers to the user's id
     );
 
     const results = await Promise.all(updates);
