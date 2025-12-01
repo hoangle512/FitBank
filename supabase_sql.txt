@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(255) PRIMARY KEY,
+  display_name VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS heart_rate_data (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(255),
+  bpm INT NOT NULL,
+  timestamp TIMESTAMPTZ NOT NULL,
+  points INT NOT NULL DEFAULT 0,
+  UNIQUE (username, timestamp)
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key VARCHAR(255) PRIMARY KEY,
+  value VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS leaderboard_stats (
+  username VARCHAR(255) PRIMARY KEY,
+  coins INT DEFAULT 0,
+  fails INT DEFAULT 0
+);

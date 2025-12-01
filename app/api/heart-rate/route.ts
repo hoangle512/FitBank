@@ -280,7 +280,9 @@ export async function POST(request: Request) {
     if (finalInsertPayload.length > 0) {
       const { error } = await supabase
         .from('heart_rate_data')
-        .insert(finalInsertPayload);
+        .insert(finalInsertPayload)
+        .onConflict(['username', 'timestamp'])
+        .ignoreDuplicates();
 
       if (error) throw error;
 
