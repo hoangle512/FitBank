@@ -64,7 +64,7 @@ export async function GET() {
 
     user.total_points += curr.points || 0
 
-    if (typeof curr.bpm === 'number') { // Increment for every BPM entry
+    if (curr.points && curr.points >= 1) { // Increment for every BPM entry that yielded at least 1 point
       user.minutes += 1
     }
 
