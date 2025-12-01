@@ -34,13 +34,13 @@ export function Leaderboard() {
                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Rank</th>
                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Participant</th>
                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">Points</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Minutes</th>
+
                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">Coins</th>
                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">Fails</th>
               </tr>
             </thead>
             <tbody>
-              {leaderboardList.map((participant: { username: string, avg_bpm: number, total_points: number, minutes: number, coins: number, fails: number }, index: number) => (
+              {leaderboardList.map((participant: { username: string, total_points: number, coins: number, fails: number }, index: number) => (
                 <tr
                   key={participant.username}
                   className="border-b border-border hover:bg-secondary/50 transition-colors"
@@ -51,15 +51,13 @@ export function Leaderboard() {
                   <td className="p-3">
                     <div>
                       <p className="font-medium">{participant.username}</p>
-                      <p className="text-xs text-muted-foreground">Avg {participant.avg_bpm || 0} BPM</p>
+
                     </div>
                   </td>
                   <td className="p-3 text-right">
                     <p className="font-bold text-primary">{participant.total_points}</p>
                   </td>
-                  <td className="p-3 text-right">
-                    <p className="font-medium">{participant.minutes}</p>
-                  </td>
+
                   <td className="p-3 text-right">
                     {/* Displays Coins from DB (Wins) */}
                     <div className="flex items-center justify-end gap-1">
