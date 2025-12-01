@@ -278,16 +278,46 @@ export async function POST(request: Request) {
 
     // 5. Bulk Insert into Supabase
     if (finalInsertPayload.length > 0) {
+      // Manual duplicate check before insertion
+      const uniquePayloadEntries = finalInsertPayload.map(entry => ({
+        username: entry.username,
+        timestamp: entry.timestamp
+      }));
+
+      // Extract unique usernames and timestamps for querying
+      const payloadUsernames = [...new Set(uniquePayloadEntries.map(e => e.username))];
+      const payloadTimestamps = [...new Set(uniquePayloadEntries.map(e => e.timestamp))];
+
+      const { data: existingRecords, error: fetchError } = await supabase
+        .from('heart_rate_data')
+        .select('username, timestamp')
+        .in('username', payloadUsernames)
+        .in('timestamp', payloadTimestamps);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const existingRecordSet = new Set(
+        existingRecords?.map(record => `${record.username}-${record.timestamp}`)
+      );
+
+      const recordsToInsert = finalInsertPayload.filter(entry => {
+        return !existingRecordSet.has(`${entry.username}-${entry.timestamp}`);
+      });
+      
+      if (recordsToInsert.length === 0) {
+        return NextResponse.json({ message: 'No new data to process after duplicate check', records_processed: 0 }, { status: 200 });
+      }
+
       const { error } = await supabase
         .from('heart_rate_data')
-        .insert(finalInsertPayload)
-        .onConflict(['username', 'timestamp'])
-        .ignoreDuplicates();
+        .insert(recordsToInsert);
 
       if (error) throw error;
 
       // New logic: After successful heart rate data import, ensure users are in the 'users' table
-      const uniqueUsernamesFromPayload = [...new Set(finalInsertPayload.map(entry => entry.username))];
+      const uniqueUsernamesFromPayload = [...new Set(recordsToInsert.map(entry => entry.username))];
       
       const usersToUpsert = uniqueUsernamesFromPayload.map(username => ({
         id: username,
