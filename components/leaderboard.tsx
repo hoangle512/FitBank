@@ -23,7 +23,7 @@ export function Leaderboard() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="text-center">
         <CardTitle>Leaderboard</CardTitle>
       </CardHeader>
       <CardContent>

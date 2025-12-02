@@ -149,7 +149,7 @@ export function AdminSettings() {
         return (
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center gap-2">
                 <Lock className="h-5 w-5" />
                 <CardTitle>Admin Settings</CardTitle>
               </div>
@@ -181,7 +181,7 @@ export function AdminSettings() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mx-auto">
                 <Settings className="h-5 w-5" />
                 <CardTitle>Admin Settings</CardTitle>
               </div>

@@ -17,7 +17,7 @@ export function PrizePoolCard() {
   return (
     <div className="mx-auto max-w-sm"> {/* Centering the Prize Pool Card */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-row items-center justify-center pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">Prize Pool</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
