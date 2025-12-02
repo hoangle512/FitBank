@@ -2,6 +2,7 @@ import { CompetitionOverview } from "@/components/competition-overview"
 import { Leaderboard } from "@/components/leaderboard"
 import { AdminSettings } from "@/components/admin-settings"
 import { CompetitionRules } from "@/components/competition-rules"
+import { PrizePoolCard } from "@/components/prize-pool-card" // Import the new component
 
 export default function Page() {
   return (
@@ -23,6 +24,7 @@ export default function Page() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-8">
+          <PrizePoolCard /> {/* Place PrizePoolCard at the top */}
           <Leaderboard />
 
           <CompetitionOverview />
