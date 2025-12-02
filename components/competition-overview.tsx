@@ -14,13 +14,13 @@ export function CompetitionOverview() {
   const competitionEndDate = adminSettings?.end_date || "N/A";
 
   return (
-    <div className="grid gap-4 md:grid-cols-2"> {/* Remaining cards in a grid */}
+    <div className="mx-auto max-w-sm"> {/* Centering the Competition Ends Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">Competition Ends</CardTitle>
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
-        <CardContent>
+        <CardContent className="text-center"> {/* Centering the text */}
           <div className="text-2xl font-bold">{competitionEndDate}</div>
           <p className="text-xs text-muted-foreground mt-1">Final submission date</p>
         </CardContent>
