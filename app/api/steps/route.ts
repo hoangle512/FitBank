@@ -20,9 +20,19 @@ const roundToNearestHour = (isoTimestamp: string): string => {
   return date.toISOString();
 };
 
+interface StepProcessingResult {
+  status: 'updated' | 'dropped' | 'inserted' | 'failed';
+  message: string;
+  username: string;
+  timestamp: string;
+  steps: number;
+  points: number;
+  details?: string;
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const results: any[] = [];
+  const results: StepProcessingResult[] = [];
 
   try {
     const json: unknown = await request.json();

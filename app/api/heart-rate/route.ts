@@ -4,8 +4,6 @@ import { calculatePointsForBpm } from '../../../lib/scoring';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-
-
 // The payload now expects a single object with parallel arrays for timestamp and bpm
 const IncomingHeartRateSchema = z.object({
   username: z.string().min(1),
@@ -41,7 +39,6 @@ export async function POST(request: Request) {
 
     try {
       json = await request.json();
-
     } catch (e: unknown) {
       if (e instanceof SyntaxError && e.message.includes('JSON')) {
         return NextResponse.json(
@@ -49,7 +46,7 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      throw e; // Re-throw other errors to be caught by the outer catch
+      throw e;
     }
 
     const initialParse = IncomingHeartRateSchema.safeParse(json);
@@ -63,15 +60,10 @@ export async function POST(request: Request) {
     }
 
     const { username, timestamp: timestampString, bpm: bpmString } = initialParse.data;
-    
-    console.log("Type of timestampString:", typeof timestampString);
-    console.log("Type of bpmString:", typeof bpmString);
 
+    // Split strings into arrays
     const timestamps = timestampString.split('\n').map((s) => s.trim()).filter(Boolean);
     const bpms = bpmString.split('\n').map((s) => s.trim()).filter(Boolean).map(Number);
-    
-    console.log("Timestamps array after split and filter:", JSON.stringify(timestamps, null, 2));
-    console.log("BPMs array after split and filter:", JSON.stringify(bpms, null, 2));
     
     if (bpms.some(isNaN)) {
       return NextResponse.json(
@@ -109,40 +101,43 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log("Incoming Data (transformed from parallel arrays):", JSON.stringify(incomingData, null, 2));
-
     if (incomingData.length === 0) {
       return NextResponse.json({ message: 'No valid data to process', records_processed: 0 });
     }
 
-    // --- The rest of the logic remains unchanged for now ---
+    // --- 1. Fetch Settings Safely ---
     const { data: settingsData, error: settingsError } = await supabase
       .from('app_settings')
       .select('value, key');
 
     if (settingsError) {
       console.error('Error fetching settings:', settingsError);
-      // Fallback to default values if settings can't be fetched
     }
 
-    const settings = settingsData?.reduce((acc, item) => {
+    // FIX: Ensure settingsData is an array to prevent "reduce is not a function" error
+    const safeSettingsData = Array.isArray(settingsData) ? settingsData : [];
+
+    const settings = safeSettingsData.reduce((acc, item) => {
       acc[item.key] = item.value;
       return acc;
-    }, {} as Record<string, string>) || {};
+    }, {} as Record<string, string>);
 
     const z1 = parseInt(settings.z1 || "125", 10);
     const z2 = parseInt(settings.z2 || "150", 10);
     const z3 = parseInt(settings.z3 || "165", 10);
-    const uniqueUsernames = [...new Set(incomingData.map((d) => d.username))];
 
-    // 1. Fetch latest timestamps for these users from Supabase
+    // --- 2. Filter Old Data ---
+    const uniqueUsernames = [...new Set(incomingData.map((d) => d.username))];
     const latestTimestampMap = new Map<string, number>();
     
+    // PERF FIX: Added limit to prevent crashing on large datasets. 
+    // Ideally, replace this with an RPC call like `get_latest_timestamp_per_user`
     const { data: existingLatest } = await supabase
       .from('heart_rate_data')
       .select('username, timestamp')
       .in('username', uniqueUsernames)
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: false })
+      .limit(5000); 
 
     if (existingLatest) {
       for (const row of existingLatest) {
@@ -152,10 +147,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Filter out data that is already in the DB
     let newRecordsToProcess = incomingData.filter((entry) => {
       const latestTime = latestTimestampMap.get(entry.username);
-      console.log(`User: ${entry.username}, Latest Time in DB: ${latestTime}, Entry Time: ${new Date(entry.timestamp).getTime()}`);
       if (!latestTime) return true; // New user
       return new Date(entry.timestamp).getTime() > latestTime;
     });
@@ -164,12 +157,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No new data to process', records_processed: 0 });
     }
 
-    // New logic: Calculate average BPM per minute
+    // --- 3. Minute Aggregation ---
     const minuteBpmAggregates = new Map<string, Map<string, { sumBpm: number; count: number; firstTimestamp: string }>>();
 
     for (const entry of newRecordsToProcess) {
       const date = new Date(entry.timestamp);
-      // Normalize timestamp to the start of the minute
       date.setSeconds(0, 0);
       const minuteTimestampString = date.toISOString();
 
@@ -184,7 +176,7 @@ export async function POST(request: Request) {
       const minuteAggregate = userMinuteMap.get(minuteTimestampString)!;
       minuteAggregate.sumBpm += entry.bpm;
       minuteAggregate.count += 1;
-      // Keep the earliest timestamp for the minute to maintain accuracy if original timestamps within a minute vary
+      
       if (new Date(entry.timestamp).getTime() < new Date(minuteAggregate.firstTimestamp).getTime()) {
         minuteAggregate.firstTimestamp = entry.timestamp;
       }
@@ -192,27 +184,24 @@ export async function POST(request: Request) {
 
     const processedMinuteEntries: HeartRateEntry[] = [];
     for (const [username, userMinuteMap] of minuteBpmAggregates.entries()) {
-      for (const [_currentMinuteTimestampString, aggregate] of userMinuteMap.entries()) {
+      for (const [, aggregate] of userMinuteMap.entries()) {
         const averageBpm = Math.round(aggregate.sumBpm / aggregate.count);
         processedMinuteEntries.push({
           username: username,
           bpm: averageBpm,
-          timestamp: aggregate.firstTimestamp, // Use the earliest timestamp from the minute
+          timestamp: aggregate.firstTimestamp,
         });
       }
     }
 
-    // Replace newRecordsToProcess with the minute-averaged entries
     newRecordsToProcess = processedMinuteEntries;
     
-    if (newRecordsToProcess.length === 0) { // Check again after processing
+    if (newRecordsToProcess.length === 0) {
       return NextResponse.json({ message: 'No new data to process after averaging', records_processed: 0 });
     }
 
-
-    // 3. Group data by User BEFORE interpolating
+    // --- 4. Interpolation ---
     const recordsByUser: Record<string, HeartRateEntry[]> = {};
-    
     newRecordsToProcess.forEach((record) => {
       if (!recordsByUser[record.username]) recordsByUser[record.username] = [];
       recordsByUser[record.username].push(record);
@@ -220,7 +209,6 @@ export async function POST(request: Request) {
 
     const finalInsertPayload: InsertPayload[] = [];
 
-    // 4. Process each user separately
     for (const username of Object.keys(recordsByUser)) {
       const userEntries = recordsByUser[username].sort(
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -235,7 +223,6 @@ export async function POST(request: Request) {
           const prevTimestamp = new Date(previousEntry.timestamp);
           const timeDiff = currentTimestamp.getTime() - prevTimestamp.getTime();
 
-          // Only interpolate if the time difference is less than or equal to 5 minutes
           if (timeDiff <= 5 * 60 * 1000) {
             const minuteIterator = new Date(prevTimestamp);
             minuteIterator.setSeconds(0, 0);
@@ -245,106 +232,54 @@ export async function POST(request: Request) {
             currentMinuteStart.setSeconds(0, 0);
 
             while (minuteIterator.getTime() < currentMinuteStart.getTime()) {
-              let factor = 0;
+              let interpolatedBpm = previousEntry.bpm; // Default to previous BPM
               if (timeDiff > 0) {
-                factor = (minuteIterator.getTime() - prevTimestamp.getTime()) / timeDiff;
+                const factor = (minuteIterator.getTime() - prevTimestamp.getTime()) / timeDiff;
+                interpolatedBpm = previousEntry.bpm + (currentEntry.bpm - previousEntry.bpm) * factor;
               }
-              const interpolatedBpm = Math.round(
-                previousEntry.bpm + factor * (currentEntry.bpm - previousEntry.bpm)
-              );
-
+              const interpolatedPoints = calculatePointsForBpm(Math.round(interpolatedBpm), z1, z2, z3);
               finalInsertPayload.push({
                 username: username,
-                bpm: interpolatedBpm,
+                bpm: Math.round(interpolatedBpm),
                 timestamp: minuteIterator.toISOString(),
-                points: calculatePointsForBpm(interpolatedBpm, z1, z2, z3),
+                points: interpolatedPoints,
               });
-
               minuteIterator.setMinutes(minuteIterator.getMinutes() + 1);
             }
           }
         }
-
-        finalInsertPayload.push({
-          username: username,
-          bpm: currentEntry.bpm,
-          timestamp: currentEntry.timestamp,
-          points: calculatePointsForBpm(currentEntry.bpm, z1, z2, z3),
-        });
-
         previousEntry = currentEntry;
       }
     }
 
-    // 5. Bulk Insert into Supabase
-    if (finalInsertPayload.length > 0) {
-      // Manual duplicate check before insertion
-      const uniquePayloadEntries = finalInsertPayload.map(entry => ({
-        username: entry.username,
-        timestamp: entry.timestamp
-      }));
-
-      // Extract unique usernames and timestamps for querying
-      const payloadUsernames = [...new Set(uniquePayloadEntries.map(e => e.username))];
-      const payloadTimestamps = [...new Set(uniquePayloadEntries.map(e => e.timestamp))];
-
-      const { data: existingRecords, error: fetchError } = await supabase
-        .from('heart_rate_data')
-        .select('username, timestamp')
-        .in('username', payloadUsernames)
-        .in('timestamp', payloadTimestamps);
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      const existingRecordSet = new Set(
-        existingRecords?.map(record => `${record.username}-${record.timestamp}`)
+    // --- 5. Batch Insert into Supabase ---
+    // Perform upsert for users in a single batch
+    const { error: userUpsertError } = await supabase
+      .from('users')
+      .upsert(
+        Array.from(new Set(finalInsertPayload.map((p) => p.username))).map((username) => ({ username }))
       );
 
-      const recordsToInsert = finalInsertPayload.filter(entry => {
-        return !existingRecordSet.has(`${entry.username}-${entry.timestamp}`);
-      });
-      
-      if (recordsToInsert.length === 0) {
-        return NextResponse.json({ message: 'No new data to process after duplicate check', records_processed: 0 }, { status: 200 });
-      }
+    if (userUpsertError) {
+      console.error("Supabase user upsert error:", userUpsertError);
+      throw userUpsertError;
+    }
+    
+    const { error: insertError } = await supabase.from('heart_rate_data').insert(finalInsertPayload);
 
-      const { error } = await supabase
-        .from('heart_rate_data')
-        .insert(recordsToInsert);
-
-      if (error) throw error;
-
-      // New logic: After successful heart rate data import, ensure users are in the 'users' table
-      const uniqueUsernamesFromPayload = [...new Set(recordsToInsert.map(entry => entry.username))];
-      
-      const usersToUpsert = uniqueUsernamesFromPayload.map(username => ({
-        id: username,
-        display_name: username, // Initialize display_name with username
-      }));
-
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert(usersToUpsert, { onConflict: 'id', ignoreDuplicates: true });
-
-      if (upsertError) {
-        console.error("Error upserting users after heart rate import:", upsertError);
-      }
+    if (insertError) {
+      console.error("Supabase insert error:", insertError);
+      throw insertError;
     }
 
     return NextResponse.json(
-      {
-        message: 'Heart rate data saved successfully.',
-        records_processed: finalInsertPayload.length,
-      },
+      { message: 'Heart rate data saved successfully.', records_processed: finalInsertPayload.length },
       { status: 201 }
     );
-
   } catch (error: unknown) {
     console.error('Outer error processing heart rate data:', error);
     return NextResponse.json(
-      { error: 'Failed to process request (outer)', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to process heart rate request', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

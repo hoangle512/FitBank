@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { POST } from '../../../app/api/steps/route'; // Adjust path as needed
 
 // Mock the Supabase client

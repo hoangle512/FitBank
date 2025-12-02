@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 // Mock the Supabase client
 const mockInsertIgnoreDuplicates = jest.fn(() => Promise.resolve({ data: {}, error: null }));
@@ -9,14 +9,12 @@ const mockInsert = jest.fn(() => ({
   onConflict: mockInsertOnConflict,
 }));
 
-const mockHeartRateOrder = jest.fn(() => Promise.resolve({ data: [], error: null }));
+const _mockHeartRateOrder = jest.fn(() => Promise.resolve({ data: [], error: null }));
 const mockUpsert = jest.fn(() => Promise.resolve({ data: {}, error: null }));
 
 // Mocks for the select chain
-const mockSelectOrder = jest.fn();
-const mockSelectIn = jest.fn(() => ({ order: mockSelectOrder }));
-const mockSelectSelect = jest.fn(() => ({ in: mockSelectIn }));
-
+const mockHeartRateIn = jest.fn(() => ({ order: _mockHeartRateOrder })); // Changed to use _mockHeartRateOrder
+const mockHeartRateSelect = jest.fn(() => ({ in: mockHeartRateIn })); // Renamed to mockHeartRateSelect to avoid confusion with the existing 'select' mock
 
 jest.mock('@/lib/supabase/server', () => ({
   createClient: jest.fn(() => ({
@@ -24,7 +22,7 @@ jest.mock('@/lib/supabase/server', () => ({
       if (tableName === 'heart_rate_data') {
         return {
           insert: mockInsert,
-          select: mockSelectSelect,
+          select: mockHeartRateSelect, // Use mockHeartRateSelect
         };
       } else if (tableName === 'app_settings') {
         return {
@@ -47,9 +45,9 @@ describe('Heart Rate API', () => {
         mockInsertIgnoreDuplicates.mockClear();
         mockInsertOnConflict.mockClear();
         mockInsert.mockClear();
-        mockSelectOrder.mockClear();
-        mockSelectIn.mockClear();
-        mockSelectSelect.mockClear();
+        _mockHeartRateOrder.mockClear(); // Clear _mockHeartRateOrder
+        mockHeartRateIn.mockClear(); // Clear mockHeartRateIn
+        mockHeartRateSelect.mockClear(); // Clear mockHeartRateSelect
         mockUpsert.mockClear();
     });
 
