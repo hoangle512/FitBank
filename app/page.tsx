@@ -29,7 +29,7 @@ export default function Page() {
 
           <CompetitionOverview />
 
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid gap-8 grid-cols-1">
             <CompetitionRules />
             <AdminSettings />
           </div>

@@ -64,7 +64,13 @@ export function CompetitionRules() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">2. Fails</h4>
+            <h4 className="font-semibold text-foreground mb-1">2. Step Points</h4>
+            <p>
+              Users also collect points based on steps. For every 200 steps, 1 point is received. Both points and steps are rounded down.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-foreground mb-1">3. Fails</h4>
             <p>
               <strong>{settings?.target_points ?? "..."} Points</strong> - If a participant fails to collect the minimum
               number of target points for the week, 1000czk goes into the bank.
