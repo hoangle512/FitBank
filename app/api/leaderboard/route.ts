@@ -92,6 +92,15 @@ export async function GET() {
     return acc;
   }, {} as Record<string, number>);
 
+  // New: Aggregate Points from Steps
+  const aggregatedStepsPoints = stepsData.reduce((acc: Record<string, number>, curr: StepsData) => {
+    if (curr.username) {
+      const pointsFromSteps = Math.floor((curr.steps || 0) / 200); // 1 point for every 200 steps, rounded down
+      acc[curr.username] = (acc[curr.username] || 0) + pointsFromSteps;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
   // 8. Aggregate Heart Rate (Minutes & Points)
   const aggregatedHeartRate = heartRateData.reduce((acc: Map<string, AggregatedUserData>, curr: HeartRateEntryData) => {
     // Skip if username is missing
@@ -104,8 +113,8 @@ export async function GET() {
         username: curr.username,
         total_points: 0,
         minutes: 0,
-        max_bpm: 0, // <--- FIX: Initialize this to 0 to avoid NaN
-      } as AggregatedUserData; // Explicitly cast to AggregatedUserData
+        max_bpm: 0,
+      } as AggregatedUserData;
       acc.set(curr.username, user)
     }
 
@@ -140,11 +149,12 @@ export async function GET() {
     // IMPORTANT: This assumes `user.display_name` matches `heart_rate_data.username` exactly
     const hrData = aggregatedHeartRate.get(user.display_name);
     const stats = statsMap.get(user.display_name);
+    const stepsPoints = aggregatedStepsPoints[user.display_name] || 0; // Get points from steps
     
     return {
       id: user.id,
       username: user.display_name || "Unknown", 
-      total_points: hrData?.total_points || 0,
+      total_points: (hrData?.total_points || 0) + stepsPoints, // Add steps points here
       minutes: hrData?.minutes || 0,
       max_bpm: hrData?.max_bpm || 0,
       total_steps_weekly: aggregatedSteps[user.display_name] || 0,
