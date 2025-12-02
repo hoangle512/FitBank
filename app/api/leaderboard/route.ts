@@ -7,14 +7,14 @@ export async function GET() {
   // Fetch target_points from app_settings
   const { data: settingsData, error: settingsError } = await supabase
     .from('app_settings')
-    .select('key, value')
-    .in('key', ['start_date', 'target_points']); // Fetch both if needed, or just target_points
+    .select('key, value');
 
   if (settingsError) {
     console.error("Supabase settings fetch error:", settingsError);
   }
 
   const targetPointsSetting = settingsData?.find(s => s.key === 'target_points');
+
   const targetPointsValue = Number(targetPointsSetting?.value) || 0;
 
   const { error: rpcError } = await supabase.rpc('calculate_weekly_stats', {
@@ -40,15 +40,33 @@ export async function GET() {
   startOfWeek.setHours(0, 0, 0, 0)
   const startOfWeekISO = startOfWeek.toISOString()
 
-  const { data: heartRateData, error: heartRateError } = await supabase
+  const { data: heartRateDataRaw, error: heartRateError } = await supabase
     .from("heart_rate_data")
-    .select("username, points, bpm")
-    .gte('timestamp', startOfWeekISO)
+    .select("username, points, bpm");
 
   if (heartRateError) {
     console.error("Supabase heart_rate_data fetch error:", heartRateError);
     return NextResponse.json({ error: heartRateError.message }, { status: 500 })
   }
+
+  const heartRateData = heartRateDataRaw.filter(entry => new Date(entry.timestamp).getTime() >= startOfWeek.getTime());
+
+  // Fetch steps data for the current week
+  const { data: stepsData, error: stepsError } = await supabase
+    .from("steps_data")
+    .select("username, steps")
+    .gte('timestamp', startOfWeekISO); // Attempt to use .gte()
+
+  if (stepsError) {
+    console.error("Supabase steps_data fetch error:", stepsError);
+    return NextResponse.json({ error: stepsError.message }, { status: 500 })
+  }
+
+  // Aggregate total steps per user for the week
+  const aggregatedSteps = stepsData.reduce((acc, curr) => {
+    acc[curr.username] = (acc[curr.username] || 0) + curr.steps;
+    return acc;
+  }, {} as Record<string, number>);
 
   const aggregatedHeartRate = heartRateData.reduce((acc, curr) => {
     let user = acc.get(curr.username)
@@ -97,6 +115,7 @@ export async function GET() {
 
 
       max_bpm: hrData?.max_bpm || 0,
+      total_steps_weekly: aggregatedSteps[user.display_name] || 0,
       coins: stats?.coins || 0,
       fails: stats?.fails || 0,
     }
