@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { POST } from '../../../app/api/steps/route'; // Adjust path as needed
 
 // Mock the Supabase client
-const mockSelectSingle = jest.fn();
+const mockSingleMethod = jest.fn(); // New simplified mock for the .single() method
 const mockInsert = jest.fn(() => Promise.resolve({ data: {}, error: null }));
 const mockUpsert = jest.fn(() => Promise.resolve({ data: {}, error: null })); // Define mockUpsert here
 const mockFrom = jest.fn((tableName) => {
@@ -11,7 +11,7 @@ const mockFrom = jest.fn((tableName) => {
       select: jest.fn(() => ({
         eq: jest.fn(() => ({
           eq: jest.fn(() => ({
-            single: mockSelectSingle,
+            single: mockSingleMethod, // Directly use mockSingleMethod here
           })),
         })),
       })),
@@ -33,14 +33,14 @@ describe('Steps API', () => {
     jest.clearAllMocks();
     mockInsert.mockClear();
     mockUpsert.mockClear(); // Clear mockUpsert in beforeEach
+    mockSingleMethod.mockClear(); // Clear mockSingleMethod
   });
 
-  it('should return 400 for invalid request data (not an array)', async () => {
-    // Sending an object instead of an array to trigger top-level schema validation failure
+  it('should return 400 for invalid request data (missing username)', async () => {
+    // Sending an object missing username
     const requestBody = {
-      username: 'testuser',
       timestamp: new Date().toISOString(),
-      steps: 1000,
+      steps: "1000",
     };
 
     const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
@@ -56,18 +56,18 @@ describe('Steps API', () => {
     expect(response.status).toBe(400);
     const responseBody = await response.json();
     expect(responseBody.error).toBe('Invalid request data');
-    expect(responseBody.details).toContain('Expected array, received object');
+    expect(responseBody.details).toContain('username');
   });
 
   it('should successfully insert new steps data', async () => {
-    mockSelectSingle.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }); // No existing entry
+    mockSingleMethod.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }); // First call
+    mockSingleMethod.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }); // Second call
     
-    const singleRequestBody = {
+    const requestBody = {
       username: 'testuser_new',
-      timestamp: new Date().toISOString(),
-      steps: 5000,
+      timestamp: "2025-12-01T11:00:00Z\n2025-12-01T12:00:00Z",
+      steps: "5000\n6000",
     };
-    const requestBody = [singleRequestBody]; // Wrap in an array
 
     const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
       method: 'POST',
@@ -79,17 +79,22 @@ describe('Steps API', () => {
 
     const response = await POST(request);
 
-    expect(response.status).toBe(200); // Expect 200 for bulk submission
+    expect(response.status).toBe(201);
     const responseBody = await response.json();
-    expect(responseBody.message).toBe('Bulk steps data processing complete.');
-    expect(responseBody.results).toHaveLength(1);
-    expect(responseBody.results[0].status).toBe('inserted');
-    expect(responseBody.results[0].message).toBe('Steps data inserted successfully.');
+    expect(responseBody.message).toBe('Steps data processed successfully.');
+    expect(responseBody.records_processed).toBe(2); // Expect 2 records processed
+    expect(mockInsert).toHaveBeenCalledTimes(2); // Ensure insert was called twice
     expect(mockInsert).toHaveBeenCalledWith({
-      username: singleRequestBody.username,
-      timestamp: expect.any(String), // hourly timestamp
-      steps: singleRequestBody.steps,
-      points: Math.floor(singleRequestBody.steps * 0.005),
+      username: 'testuser_new',
+      timestamp: expect.any(String), // hourly timestamp for first entry
+      steps: 5000,
+      points: Math.floor(5000 * 0.005),
+    });
+    expect(mockInsert).toHaveBeenCalledWith({
+      username: 'testuser_new',
+      timestamp: expect.any(String), // hourly timestamp for second entry
+      steps: 6000,
+      points: Math.floor(6000 * 0.005),
     });
   });
 
@@ -100,17 +105,16 @@ describe('Steps API', () => {
     const fixedTimestamp = new Date().toISOString();
     const hourlyTimestamp = new Date(fixedTimestamp).setMinutes(0, 0, 0);
 
-    mockSelectSingle.mockResolvedValueOnce({
+    mockSingleMethod.mockResolvedValueOnce({
       data: { id: 'some-id', username, timestamp: new Date(hourlyTimestamp).toISOString(), steps: existingSteps },
       error: null,
     });
     
-    const singleRequestBody = {
+    const requestBody = {
       username,
-      timestamp: fixedTimestamp,
-      steps: incomingSteps,
+      timestamp: fixedTimestamp, // single timestamp, but still a string
+      steps: String(incomingSteps), // single steps, but still a string
     };
-    const requestBody = [singleRequestBody]; // Wrap in an array
 
     const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
       method: 'POST',
@@ -122,12 +126,10 @@ describe('Steps API', () => {
 
     const response = await POST(request);
 
-    expect(response.status).toBe(200); // Expect 200 for bulk submission
+    expect(response.status).toBe(201);
     const responseBody = await response.json();
-    expect(responseBody.message).toBe('Bulk steps data processing complete.');
-    expect(responseBody.results).toHaveLength(1);
-    expect(responseBody.results[0].status).toBe('updated');
-    expect(responseBody.results[0].message).toBe('Steps data updated successfully (higher reading).');
+    expect(responseBody.message).toBe('Steps data processed successfully.');
+    expect(responseBody.records_processed).toBe(1);
     expect(mockUpsert).toHaveBeenCalledWith(
       {
         id: 'some-id',
@@ -138,7 +140,7 @@ describe('Steps API', () => {
       },
       { onConflict: 'id' }
     );
-    expect(mockInsert).not.toHaveBeenCalled(); // Ensure insert was not called
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it('should drop incoming steps data if steps are lower or equal to existing', async () => {
@@ -148,17 +150,16 @@ describe('Steps API', () => {
     const fixedTimestamp = new Date().toISOString();
     const hourlyTimestamp = new Date(fixedTimestamp).setMinutes(0, 0, 0);
 
-    mockSelectSingle.mockResolvedValueOnce({
+    mockSingleMethod.mockResolvedValueOnce({
       data: { id: 'some-id', username, timestamp: new Date(hourlyTimestamp).toISOString(), steps: existingSteps },
       error: null,
     });
     
-    const singleRequestBody = {
+    const requestBody = {
       username,
-      timestamp: fixedTimestamp,
-      steps: incomingSteps,
+      timestamp: fixedTimestamp, // single timestamp, but still a string
+      steps: String(incomingSteps), // single steps, but still a string
     };
-    const requestBody = [singleRequestBody]; // Wrap in an array
 
     const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
       method: 'POST',
@@ -170,13 +171,56 @@ describe('Steps API', () => {
 
     const response = await POST(request);
 
-    expect(response.status).toBe(200); // Expect 200 for bulk submission
+    expect(response.status).toBe(201); // Still 201 because the request was processed
     const responseBody = await response.json();
-    expect(responseBody.message).toBe('Bulk steps data processing complete.');
-    expect(responseBody.results).toHaveLength(1);
-    expect(responseBody.results[0].status).toBe('dropped');
-    expect(responseBody.results[0].message).toBe('Steps data dropped (lower or equal reading).');
-    expect(mockUpsert).not.toHaveBeenCalled(); // Ensure upsert was not called
-    expect(mockInsert).not.toHaveBeenCalled(); // Ensure insert was not called
+    expect(responseBody.message).toBe('Steps data processed successfully.');
+    expect(responseBody.records_processed).toBe(0); // 0 records processed because it was dropped
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('should return 400 for mismatched timestamp and steps array lengths', async () => {
+    const requestBody = {
+      username: 'testuser_mismatch',
+      timestamp: "2025-12-01T11:00:00Z\n2025-12-01T12:00:00Z", // Two timestamps
+      steps: "1000", // Only one step
+    };
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    const responseBody = await response.json();
+    expect(responseBody.error).toBe('Invalid request data');
+    expect(responseBody.details).toContain('Timestamp and Steps arrays must have the same length after parsing.');
+  });
+
+  it('should return 400 for invalid step data (non-numeric values)', async () => {
+    const requestBody = {
+      username: 'testuser_invalid_steps',
+      timestamp: "2025-12-01T11:00:00Z",
+      steps: "1000\nabc", // 'abc' is not a number
+    };
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    const responseBody = await response.json();
+    expect(responseBody.error).toBe('Invalid Steps data');
+    expect(responseBody.details).toContain('One or more step values are not valid numbers.');
   });
 });
