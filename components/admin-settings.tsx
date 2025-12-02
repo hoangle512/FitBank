@@ -206,12 +206,12 @@ export function AdminSettings() {
                   <Label htmlFor="prize-pool-adjustment">Prize Pool Adjustment</Label>
                   <Input id="prize-pool-adjustment" type="number" value={prizePoolAdjustment} onChange={(e) => setPrizePoolAdjustment(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2"><Label htmlFor="z1">Z1</Label><Input id="z1" type="number" value={z1} onChange={(e) => setZ1(e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="z2">Z2</Label><Input id="z2" type="number" value={z2} onChange={(e) => setZ2(e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="z3">Z3</Label><Input id="z3" type="number" value={z3} onChange={(e) => setZ3(e.target.value)} /></div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2"><Label htmlFor="start-date">Start Date</Label><Input id="start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="end-date">End Date</Label><Input id="end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
                 </div>
@@ -222,7 +222,7 @@ export function AdminSettings() {
                 <h3 className="text-lg font-medium">User Aliases</h3>
                 <div className="space-y-2">
                   {users.map((user) => (
-                    <div key={user.id} className="grid grid-cols-2 gap-4 items-center">
+                    <div key={user.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                       <Label>{user.id}</Label>
                       <Input
                         value={user.display_name || ''}
