@@ -21,28 +21,32 @@ export function CompetitionOverview() {
   const competitionEndDate = adminSettings?.end_date || "N/A"; // Use fetched end_date
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Prize Pool</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{prizePool} CZK</div>
-          <p className="text-xs text-muted-foreground mt-1">Total prize money based on fails</p>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="mx-auto max-w-sm"> {/* Centering the Prize Pool Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Prize Pool</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="text-center"> {/* Centering the text */}
+            <div className="text-2xl font-bold">{prizePool} CZK</div>
+            <p className="text-xs text-muted-foreground mt-1">Total prize money based on fails</p>
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Competition Ends</CardTitle>
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{competitionEndDate}</div>
-          <p className="text-xs text-muted-foreground mt-1">Final submission date</p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2"> {/* Remaining cards in a grid */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Competition Ends</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{competitionEndDate}</div>
+            <p className="text-xs text-muted-foreground mt-1">Final submission date</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

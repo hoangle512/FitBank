@@ -23,9 +23,9 @@ export default function Page() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          <CompetitionOverview />
-
           <Leaderboard />
+
+          <CompetitionOverview />
 
           <div className="grid gap-8 lg:grid-cols-2">
             <CompetitionRules />
