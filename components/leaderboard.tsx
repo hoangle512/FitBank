@@ -31,14 +31,14 @@ export function Leaderboard() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Rank</th>
+                <th className="w-16 text-left p-3 text-sm font-medium text-muted-foreground">Rank</th>
                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Participant</th>
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Points</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Minutes</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Steps</th>
+                <th className="w-24 text-left p-3 text-sm font-medium text-muted-foreground">Points</th>
+                <th className="w-24 text-right p-3 text-sm font-medium text-muted-foreground">Minutes</th>
+                <th className="w-24 text-right p-3 text-sm font-medium text-muted-foreground">Steps</th>
 
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Coins</th>
-                <th className="text-right p-3 text-sm font-medium text-muted-foreground">Fails</th>
+                <th className="w-24 text-right p-3 text-sm font-medium text-muted-foreground">Coins</th>
+                <th className="w-24 text-right p-3 text-sm font-medium text-muted-foreground">Fails</th>
               </tr>
             </thead>
             <tbody>
@@ -47,32 +47,31 @@ export function Leaderboard() {
                   key={participant.username}
                   className="border-b border-border hover:bg-secondary/50 transition-colors"
                 >
-                  <td className="p-3">
+                  <td className="w-16 p-3">
                     <div className="flex items-center justify-center w-8">{getRankIcon(index)}</div>
                   </td>
                   <td className="p-3">
                     <div>
                       <p className="font-medium">{participant.username}</p>
-
                     </div>
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="w-24 p-3 text-right">
                     <p className="font-bold text-primary">{participant.total_points}</p>
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="w-24 p-3 text-right">
                     <p className="font-medium">{participant.minutes}</p>
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="w-24 p-3 text-right">
                     <p className="font-medium">{participant.total_steps_weekly}</p>
                   </td>
 
-                  <td className="p-3 text-right">
+                  <td className="w-24 p-3 text-right">
                     {/* Displays Coins from DB (Wins) */}
                     <div className="flex items-center justify-end gap-1">
                         <span className="font-medium text-amber-500">{participant.coins ?? 0}</span>
                     </div>
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="w-24 p-3 text-right">
                     {/* Displays Fails from DB */}
                     <p className="font-medium text-destructive">{participant.fails ?? 0}</p>
                   </td>
