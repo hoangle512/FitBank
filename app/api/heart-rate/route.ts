@@ -240,7 +240,7 @@ export async function POST(request: Request) {
       throw userUpsertError;
     }
     
-    const { error: insertError } = await supabase.from('heart_rate_data').upsert(finalInsertPayload);
+    const { error: insertError } = await supabase.from('heart_rate_data').upsert(finalInsertPayload, { onConflict: ['username', 'timestamp'] });
 
     if (insertError) {
       console.error("Supabase insert error:", insertError);
