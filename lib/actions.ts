@@ -72,7 +72,7 @@ export async function updateStepData(finalInsertPayload: StepData[]) {
     throw userUpsertError;
   }
 
-  const { error: upsertError } = await supabase.from('steps_data').upsert(finalInsertPayload);
+  const { error: upsertError } = await supabase.from('steps_data').upsert(finalInsertPayload, { onConflict: ['username', 'timestamp'] });
 
   if (upsertError) {
     console.error("Supabase upsert error:", upsertError);
