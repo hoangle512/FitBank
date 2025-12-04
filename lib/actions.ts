@@ -64,7 +64,7 @@ export async function updateStepData(finalInsertPayload: StepData[]) {
   const { error: userUpsertError } = await supabase
     .from('users')
     .upsert(
-      Array.from(new Set(finalInsertPayload.map((p) => p.username))).map((username) => ({ username }))
+      Array.from(new Set(finalInsertPayload.map((p) => p.username))).map((username) => ({ id: username, display_name: username }))
     );
 
   if (userUpsertError) {
