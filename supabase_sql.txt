@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
-  id VARCHAR(255) PRIMARY KEY,
-  display_name VARCHAR(255)
+  username VARCHAR(255) PRIMARY KEY, -- Changed from id to username
+  display_name VARCHAR(255),
+  avatar TEXT -- Assuming an avatar column exists in users table
 );
 
 CREATE TABLE IF NOT EXISTS heart_rate_data (
@@ -22,3 +23,26 @@ CREATE TABLE IF NOT EXISTS leaderboard_stats (
   coins INT DEFAULT 0,
   fails INT DEFAULT 0
 );
+
+CREATE OR REPLACE FUNCTION get_weekly_standings()
+RETURNS TABLE(username text, score bigint, avatar text)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        hr.username,
+        SUM(hr.points)::bigint as score,
+        u.avatar::text
+    FROM
+        heart_rate_data hr
+    JOIN
+        users u ON hr.username = u.username
+    WHERE
+        hr.timestamp >= date_trunc('week', CURRENT_TIMESTAMP)
+    GROUP BY
+        hr.username, u.avatar
+    ORDER BY
+        score DESC;
+END;
+$$;
