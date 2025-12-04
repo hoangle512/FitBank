@@ -49,3 +49,48 @@ export async function getWeeklyStandings(): Promise<Standing[]> {
     return []
   }
 }
+
+interface StepData {
+  username: string;
+  timestamp: string;
+  steps: number;
+  points: number;
+}
+
+export async function updateStepData(finalInsertPayload: StepData[]) {
+  const supabase = await createClient();
+
+  // Perform upsert for users in a single batch
+  const { error: userUpsertError } = await supabase
+    .from('users')
+    .upsert(
+      Array.from(new Set(finalInsertPayload.map((p) => p.username))).map((username) => ({ username }))
+    );
+
+  if (userUpsertError) {
+    console.error("Supabase user upsert error:", userUpsertError);
+    throw userUpsertError;
+  }
+
+  const { error: upsertError } = await supabase.from('steps_data').upsert(finalInsertPayload);
+
+  if (upsertError) {
+    console.error("Supabase upsert error:", upsertError);
+    throw upsertError;
+  }
+}
+
+export async function getStepData(username: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('steps_data')
+    .select('*')
+    .eq('username', username)
+    .order('timestamp', { ascending: false });
+
+  if (error) {
+    console.error("Error fetching step data:", error);
+    throw error;
+  }
+  return data;
+}

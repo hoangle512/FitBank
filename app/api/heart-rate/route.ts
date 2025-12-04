@@ -126,39 +126,13 @@ export async function POST(request: Request) {
     const z2 = parseInt(settings.z2 || "150", 10);
     const z3 = parseInt(settings.z3 || "165", 10);
 
-    // --- 2. Filter Old Data ---
-    const uniqueUsernames = [...new Set(incomingData.map((d) => d.username))];
-    const latestTimestampMap = new Map<string, number>();
-    
-    // PERF FIX: Added limit to prevent crashing on large datasets. 
-    // Ideally, replace this with an RPC call like `get_latest_timestamp_per_user`
-    const { data: existingLatest } = await supabase
-      .from('heart_rate_data')
-      .select('username, timestamp')
-      .in('username', uniqueUsernames)
-      .order('timestamp', { ascending: false })
-      .limit(5000); 
+    let newRecordsToProcess = incomingData;
 
-    if (existingLatest) {
-      for (const row of existingLatest) {
-        if (!latestTimestampMap.has(row.username)) {
-          latestTimestampMap.set(row.username, new Date(row.timestamp).getTime());
-        }
-      }
-    }
 
-    let newRecordsToProcess = incomingData.filter((entry) => {
-      const latestTime = latestTimestampMap.get(entry.username);
-      if (!latestTime) return true; // New user
-      return new Date(entry.timestamp).getTime() > latestTime;
-    });
 
-    if (newRecordsToProcess.length === 0) {
-      return NextResponse.json({ message: 'No new data to process', records_processed: 0 });
-    }
 
     // --- 3. Minute Aggregation ---
-    const minuteBpmAggregates = new Map<string, Map<string, { sumBpm: number; count: number; firstTimestamp: string }>>();
+    const minuteBpmAggregates = new Map<string, Map<string, { sumBpm: number; count: number; }>>();
 
     for (const entry of newRecordsToProcess) {
       const date = new Date(entry.timestamp);
@@ -171,25 +145,21 @@ export async function POST(request: Request) {
       const userMinuteMap = minuteBpmAggregates.get(entry.username)!;
 
       if (!userMinuteMap.has(minuteTimestampString)) {
-        userMinuteMap.set(minuteTimestampString, { sumBpm: 0, count: 0, firstTimestamp: entry.timestamp });
+        userMinuteMap.set(minuteTimestampString, { sumBpm: 0, count: 0 });
       }
       const minuteAggregate = userMinuteMap.get(minuteTimestampString)!;
       minuteAggregate.sumBpm += entry.bpm;
       minuteAggregate.count += 1;
-      
-      if (new Date(entry.timestamp).getTime() < new Date(minuteAggregate.firstTimestamp).getTime()) {
-        minuteAggregate.firstTimestamp = entry.timestamp;
-      }
     }
 
     const processedMinuteEntries: HeartRateEntry[] = [];
     for (const [username, userMinuteMap] of minuteBpmAggregates.entries()) {
-      for (const [, aggregate] of userMinuteMap.entries()) {
+      for (const [minuteTimestampString, aggregate] of userMinuteMap.entries()) {
         const averageBpm = Math.round(aggregate.sumBpm / aggregate.count);
         processedMinuteEntries.push({
           username: username,
           bpm: averageBpm,
-          timestamp: aggregate.firstTimestamp,
+          timestamp: minuteTimestampString, // Use the minute-aligned timestamp
         });
       }
     }
@@ -207,7 +177,12 @@ export async function POST(request: Request) {
       recordsByUser[record.username].push(record);
     });
 
-    const finalInsertPayload: InsertPayload[] = [];
+    const finalInsertPayload: InsertPayload[] = processedMinuteEntries.map(entry => ({
+      username: entry.username,
+      bpm: entry.bpm,
+      timestamp: entry.timestamp,
+      points: calculatePointsForBpm(entry.bpm, z1, z2, z3),
+    }));
 
     for (const username of Object.keys(recordsByUser)) {
       const userEntries = recordsByUser[username].sort(
@@ -265,7 +240,7 @@ export async function POST(request: Request) {
       throw userUpsertError;
     }
     
-    const { error: insertError } = await supabase.from('heart_rate_data').insert(finalInsertPayload);
+    const { error: insertError } = await supabase.from('heart_rate_data').upsert(finalInsertPayload);
 
     if (insertError) {
       console.error("Supabase insert error:", insertError);

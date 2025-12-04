@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
-import { POST } from '../../../app/api/steps/route'; // Adjust path as needed
+
+const mockUpdateStepData = jest.fn();
+const mockGetStepData = jest.fn();
 
 // Mock the Supabase client
 const mockSingleMethod = jest.fn(); // New simplified mock for the .single() method
@@ -10,13 +12,17 @@ const mockFrom = jest.fn((tableName) => {
     return {
       select: jest.fn(() => ({
         eq: jest.fn(() => ({
-          eq: jest.fn(() => ({
-            single: mockSingleMethod, // Directly use mockSingleMethod here
+          order: jest.fn(() => ({
+            single: mockSingleMethod,
           })),
         })),
       })),
-      upsert: mockUpsert, // Use the defined mockUpsert
+      upsert: mockUpsert,
       insert: mockInsert,
+    };
+  } else if (tableName === 'users') { // Added for users table upsert
+    return {
+      upsert: mockUpsert,
     };
   }
   return {};
@@ -28,12 +34,24 @@ jest.mock('@/lib/supabase/server', () => ({
   })),
 }));
 
+jest.mock('@/lib/actions', () => ({
+  updateStepData: mockUpdateStepData,
+  getStepData: mockGetStepData,
+}));
+
+// Now import the module under test after all mocks are defined
+import { POST, GET } from '../../../app/api/steps/route'; // Adjust path as needed
+
 describe('Steps API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockInsert.mockClear();
     mockUpsert.mockClear(); // Clear mockUpsert in beforeEach
     mockSingleMethod.mockClear(); // Clear mockSingleMethod
+    mockUpdateStepData.mockReset(); // Reset the mock state, not just clear calls
+    mockGetStepData.mockReset(); // Reset the mock state, not just clear calls
+    mockUpdateStepData.mockImplementation(() => Promise.resolve());
+    mockGetStepData.mockImplementation(() => Promise.resolve([]));
   });
 
   it('should return 400 for invalid request data (missing username)', async () => {
@@ -60,9 +78,6 @@ describe('Steps API', () => {
   });
 
   it('should successfully insert new steps data', async () => {
-    mockSingleMethod.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }); // First call
-    mockSingleMethod.mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } }); // Second call
-    
     const requestBody = {
       username: 'testuser_new',
       timestamp: "2025-12-01T11:00:00Z\n2025-12-01T12:00:00Z",
@@ -82,38 +97,35 @@ describe('Steps API', () => {
     expect(response.status).toBe(201);
     const responseBody = await response.json();
     expect(responseBody.message).toBe('Steps data processed successfully.');
-    expect(responseBody.records_processed).toBe(2); // Expect 2 records processed
-    expect(mockInsert).toHaveBeenCalledTimes(2); // Ensure insert was called twice
-    expect(mockInsert).toHaveBeenCalledWith({
-      username: 'testuser_new',
-      timestamp: expect.any(String), // hourly timestamp for first entry
-      steps: 5000,
-      points: Math.floor(5000 * 0.005),
-    });
-    expect(mockInsert).toHaveBeenCalledWith({
-      username: 'testuser_new',
-      timestamp: expect.any(String), // hourly timestamp for second entry
-      steps: 6000,
-      points: Math.floor(6000 * 0.005),
-    });
+    expect(responseBody.records_processed).toBe(2); // Expect 2 records processed (2 unique hourly records)
+    expect(mockUpdateStepData).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStepData).toHaveBeenCalledWith([
+      {
+        username: 'testuser_new',
+        timestamp: '2025-12-01T11:00:00.000Z',
+        steps: 5000,
+        points: Math.floor(5000 * 0.005),
+      },
+      {
+        username: 'testuser_new',
+        timestamp: '2025-12-01T12:00:00.000Z',
+        steps: 6000,
+        points: Math.floor(6000 * 0.005),
+      },
+    ]);
   });
 
-  it('should update existing steps data if incoming steps are higher', async () => {
-    const existingSteps = 3000;
+  it('should replace existing steps data for the same hour (higher steps)', async () => {
     const incomingSteps = 5000;
     const username = 'testuser_update';
-    const fixedTimestamp = new Date().toISOString();
-    const hourlyTimestamp = new Date(fixedTimestamp).setMinutes(0, 0, 0);
+    const fixedTimestamp = '2025-12-01T11:30:00Z'; // Time within an hour
+    const hourlyTimestamp = new Date(fixedTimestamp);
+    hourlyTimestamp.setMinutes(0, 0, 0); // Round to the hour
 
-    mockSingleMethod.mockResolvedValueOnce({
-      data: { id: 'some-id', username, timestamp: new Date(hourlyTimestamp).toISOString(), steps: existingSteps },
-      error: null,
-    });
-    
     const requestBody = {
       username,
-      timestamp: fixedTimestamp, // single timestamp, but still a string
-      steps: String(incomingSteps), // single steps, but still a string
+      timestamp: fixedTimestamp,
+      steps: String(incomingSteps),
     };
 
     const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
@@ -130,35 +142,28 @@ describe('Steps API', () => {
     const responseBody = await response.json();
     expect(responseBody.message).toBe('Steps data processed successfully.');
     expect(responseBody.records_processed).toBe(1);
-    expect(mockUpsert).toHaveBeenCalledWith(
+    expect(mockUpdateStepData).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStepData).toHaveBeenCalledWith([
       {
-        id: 'some-id',
         username,
-        timestamp: new Date(hourlyTimestamp).toISOString(),
+        timestamp: hourlyTimestamp.toISOString(),
         steps: incomingSteps,
         points: Math.floor(incomingSteps * 0.005),
       },
-      { onConflict: 'id' }
-    );
-    expect(mockInsert).not.toHaveBeenCalled();
+    ]);
   });
 
-  it('should drop incoming steps data if steps are lower or equal to existing', async () => {
-    const existingSteps = 5000;
-    const incomingSteps = 3000; // Lower than existing
-    const username = 'testuser_drop';
-    const fixedTimestamp = new Date().toISOString();
-    const hourlyTimestamp = new Date(fixedTimestamp).setMinutes(0, 0, 0);
+  it('should replace existing steps data for the same hour (lower or equal steps)', async () => {
+    const incomingSteps = 3000; // Lower than existing (old logic)
+    const username = 'testuser_replace_lower';
+    const fixedTimestamp = '2025-12-01T13:45:00Z'; // Time within an hour
+    const hourlyTimestamp = new Date(fixedTimestamp);
+    hourlyTimestamp.setMinutes(0, 0, 0); // Round to the hour
 
-    mockSingleMethod.mockResolvedValueOnce({
-      data: { id: 'some-id', username, timestamp: new Date(hourlyTimestamp).toISOString(), steps: existingSteps },
-      error: null,
-    });
-    
     const requestBody = {
       username,
-      timestamp: fixedTimestamp, // single timestamp, but still a string
-      steps: String(incomingSteps), // single steps, but still a string
+      timestamp: fixedTimestamp,
+      steps: String(incomingSteps),
     };
 
     const request = new NextRequest(new URL('http://localhost:3000/api/steps'), {
@@ -171,11 +176,19 @@ describe('Steps API', () => {
 
     const response = await POST(request);
 
-    expect(response.status).toBe(201); // Still 201 because the request was processed
+    expect(response.status).toBe(201);
     const responseBody = await response.json();
     expect(responseBody.message).toBe('Steps data processed successfully.');
-    expect(responseBody.records_processed).toBe(0); // 0 records processed because it was dropped
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(responseBody.records_processed).toBe(1); // 1 record processed because it's replaced
+    expect(mockUpdateStepData).toHaveBeenCalledTimes(1);
+    expect(mockUpdateStepData).toHaveBeenCalledWith([
+      {
+        username,
+        timestamp: hourlyTimestamp.toISOString(),
+        steps: incomingSteps,
+        points: Math.floor(incomingSteps * 0.005),
+      },
+    ]);
   });
 
   it('should return 400 for mismatched timestamp and steps array lengths', async () => {
@@ -223,4 +236,46 @@ describe('Steps API', () => {
     expect(responseBody.error).toBe('Invalid Steps data');
     expect(responseBody.details).toContain('One or more step values are not valid numbers.');
   });
+
+  it('should successfully retrieve step data for a given username', async () => {
+    const username = 'testuser_get';
+    const mockData = [
+      { username, timestamp: '2025-12-01T10:00:00Z', steps: 1000, points: 5 },
+      { username, timestamp: '2025-12-01T09:00:00Z', steps: 800, points: 4 },
+    ];
+    mockGetStepData.mockResolvedValueOnce(mockData);
+
+    const request = new NextRequest(new URL(`http://localhost:3000/api/steps?username=${username}`));
+    const response = await GET(request);
+
+    expect(response.status).toBe(200);
+    const responseBody = await response.json();
+    expect(responseBody).toEqual(mockData);
+    expect(mockGetStepData).toHaveBeenCalledTimes(1);
+    expect(mockGetStepData).toHaveBeenCalledWith(username);
+  });
+
+  it('should return 400 if username is missing for GET request', async () => {
+    const request = new NextRequest(new URL('http://localhost:3000/api/steps'));
+    const response = await GET(request);
+
+    expect(response.status).toBe(400);
+    const responseBody = await response.json();
+    expect(responseBody.error).toBe('Username is required');
+  });
+
+  it('should handle errors during GET request', async () => {
+    const username = 'testuser_error';
+    const errorMessage = 'Database query failed';
+    mockGetStepData.mockRejectedValueOnce(new Error(errorMessage));
+
+    const request = new NextRequest(new URL(`http://localhost:3000/api/steps?username=${username}`));
+    const response = await GET(request);
+
+    expect(response.status).toBe(500);
+    const responseBody = await response.json();
+    expect(responseBody.error).toBe('Failed to fetch step data');
+    expect(responseBody.details).toContain(errorMessage);
+  });
 });
+

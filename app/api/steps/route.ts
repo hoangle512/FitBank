@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
+import { updateStepData, getStepData } from '@/lib/actions';
 
 // The payload now expects a single object with parallel arrays for timestamp and steps
 const IncomingStepSchema = z.object({
@@ -105,58 +106,67 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No valid data to process', records_processed: 0 }, {status: 200});
     }
 
-    let recordsProcessed = 0;
+    const hourlyStepAggregates = new Map<string, Map<string, { sumSteps: number; }>>();
 
-    for (const { username: entryUsername, timestamp: entryTimestamp, steps: entrySteps } of incomingData) {
-      const hourlyTimestamp = roundToNearestHour(entryTimestamp);
-      const points = Math.floor(entrySteps * 0.005);
+    for (const entry of incomingData) {
+      const hourlyTimestamp = roundToNearestHour(entry.timestamp);
 
-      try {
-        // 1. Check for existing entry for the same user and hourly timestamp
-        const { data: existingEntry, error: fetchError } = await supabase
-          .from('steps_data')
-          .select('id, steps')
-          .eq('username', entryUsername)
-          .eq('timestamp', hourlyTimestamp)
-          .single();
-
-        if (fetchError && fetchError.code !== 'PGRST116') {
-            console.error("Supabase fetch existing steps error:", fetchError);
-            throw fetchError;
-        }
-
-        if (existingEntry) {
-          if (entrySteps > existingEntry.steps) {
-            const { error: updateError } = await supabase
-              .from('steps_data')
-              .upsert({ id: existingEntry.id, username: entryUsername, timestamp: hourlyTimestamp, steps: entrySteps, points }, { onConflict: 'id' });
-
-            if (updateError) throw updateError;
-            recordsProcessed++;
-          }
-        } else {
-          const { error: insertError } = await supabase
-            .from('steps_data')
-            .insert({ username: entryUsername, timestamp: hourlyTimestamp, steps: entrySteps, points });
-
-          if (insertError) throw insertError;
-          recordsProcessed++;
-        }
-      } catch (innerError: unknown) {
-        console.error(`Error processing step data for user ${entryUsername} at ${entryTimestamp}:`, innerError);
-        // Continue processing other entries even if one fails
+      if (!hourlyStepAggregates.has(entry.username)) {
+        hourlyStepAggregates.set(entry.username, new Map());
       }
+      const userHourlyMap = hourlyStepAggregates.get(entry.username)!;
+
+      if (!userHourlyMap.has(hourlyTimestamp)) {
+        userHourlyMap.set(hourlyTimestamp, { sumSteps: 0 });
+      }
+      const hourlyAggregate = userHourlyMap.get(hourlyTimestamp)!;
+      hourlyAggregate.sumSteps += entry.steps;
     }
 
+    const finalInsertPayload: { username: string; timestamp: string; steps: number; points: number; }[] = [];
+    for (const [username, userHourlyMap] of hourlyStepAggregates.entries()) {
+      for (const [hourlyTimestamp, aggregate] of userHourlyMap.entries()) {
+        const points = Math.floor(aggregate.sumSteps * 0.005);
+        finalInsertPayload.push({
+          username: username,
+          timestamp: hourlyTimestamp,
+          steps: aggregate.sumSteps,
+          points: points,
+        });
+      }
+    }
+    
+    await updateStepData(finalInsertPayload);
+
     return NextResponse.json(
-      { message: 'Steps data processed successfully.', records_processed: recordsProcessed },
-      { status: 201 } // Return 201 if at least one record was processed
+      { message: 'Steps data processed successfully.', records_processed: finalInsertPayload.length },
+      { status: 201 }
     );
 
   } catch (error: unknown) {
     console.error('Outer error processing steps data:', error);
     return NextResponse.json(
       { error: 'Failed to process steps request', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const username = searchParams.get('username');
+
+  if (!username) {
+    return NextResponse.json({ error: 'Username is required' }, { status: 400 });
+  }
+
+  try {
+    const stepData = await getStepData(username);
+    return NextResponse.json(stepData, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching step data:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch step data', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

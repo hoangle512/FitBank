@@ -21,8 +21,9 @@ jest.mock('@/lib/supabase/server', () => ({
     from: jest.fn((tableName) => {
       if (tableName === 'heart_rate_data') {
         return {
-          insert: mockInsert,
-          select: mockHeartRateSelect, // Use mockHeartRateSelect
+          insert: mockInsert, // Still need this for now for the first test, will remove if it passes
+          select: mockHeartRateSelect,
+          upsert: mockUpsert, // Add upsert for heart_rate_data
         };
       } else if (tableName === 'app_settings') {
         return {
@@ -53,7 +54,7 @@ describe('Heart Rate API', () => {
 
               it('should successfully save heart rate data', async () => {
                 // Configure the select chain for heart_rate_data for this call
-                mockSelectOrder.mockImplementationOnce(() => Promise.resolve({ data: [], error: null }));
+                _mockHeartRateOrder.mockImplementationOnce(() => Promise.resolve({ data: [], error: null }));
                 mockInsertIgnoreDuplicates.mockImplementationOnce(() => Promise.resolve({ data: {}, error: null }));
                 mockUpsert.mockImplementationOnce(() => Promise.resolve({ data: {}, error: null }));
             
@@ -77,7 +78,7 @@ describe('Heart Rate API', () => {
                 const responseBody = await response.json();
                 expect(responseBody.message).toBe('Heart rate data saved successfully.');
                 expect(responseBody.records_processed).toBe(1);
-              });  it('should prevent duplicate heart rate data entries', async () => {
+              });  it('should replace existing heart rate data for the same minute', async () => {
     const fixedTimestamp = '2025-12-01T10:00:00.000Z'; // Use a fixed timestamp
     const username = 'testuser_duplicate';
 
@@ -89,7 +90,7 @@ describe('Heart Rate API', () => {
 
                                 // --- Mocking for the FIRST insertion ---
                                 // Simulate no existing heart rate data for the user initially
-                                mockSelectOrder.mockImplementationOnce(() => Promise.resolve({ data: [], error: null }));
+                                _mockHeartRateOrder.mockImplementationOnce(() => Promise.resolve({ data: [], error: null }));
                                 // Simulate successful insert of heart rate data
                                 mockInsertIgnoreDuplicates.mockImplementationOnce(() => Promise.resolve({ data: {}, error: null }));
                                 // Simulate successful upsert of user data
@@ -113,16 +114,6 @@ describe('Heart Rate API', () => {
                                 expect(responseBody1.records_processed).toBe(1);
 
                             
-                                // --- Mocking for the SECOND insertion (duplicate) ---
-                                // Simulate that the data already exists in the DB for the user
-                                // This will cause newRecordsToProcess to be empty in the API route
-                                mockSelectOrder.mockImplementationOnce(() => Promise.resolve({ data: [{ username: username, timestamp: fixedTimestamp }], error: null }));
-                                // Simulate successful insert (or ignored duplicate) of heart rate data
-                                mockInsertIgnoreDuplicates.mockImplementationOnce(() => Promise.resolve({ data: {}, error: null }));
-                                // Simulate successful upsert of user data
-                                mockUpsert.mockImplementationOnce(() => Promise.resolve({ data: {}, error: null }));
-
-                            
                                 // Second insertion of the exact same data
                                 const request2 = new NextRequest(new URL('http://localhost:3000/api/heart-rate'), {
                                   method: 'POST',
@@ -134,15 +125,13 @@ describe('Heart Rate API', () => {
 
                             
                                 const response2 = await POST(request2);
-                                expect(response2.status).toBe(200); // Should return 200 because no new data is processed
+                                expect(response2.status).toBe(201); // Should return 201 as it's an upsert (update/insert)
                                 const responseBody2 = await response2.json();
-                                expect(responseBody2.message).toBe('No new data to process');
-                                expect(responseBody2.records_processed).toBe(0);
+                                expect(responseBody2.message).toBe('Heart rate data saved successfully.');
+                                expect(responseBody2.records_processed).toBe(1); // Should be 1 because it processes and updates/inserts
 
                             
                                 // Verify that Supabase interactions were called as expected
-                                // Specifically, mockSelectOrder, mockInsertIgnoreDuplicates, and mockUpsert should have been called for each "insertion" attempt.
-                                expect(mockSelectOrder).toHaveBeenCalledTimes(2);
-                                expect(mockInsertIgnoreDuplicates).toHaveBeenCalledTimes(1);
-                                          expect(mockUpsert).toHaveBeenCalledTimes(1);  });
+                                // mockUpsert should have been called for user and heart_rate_data
+                                expect(mockUpsert).toHaveBeenCalledTimes(4);  });
               });
