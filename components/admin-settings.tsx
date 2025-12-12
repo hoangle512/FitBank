@@ -148,7 +148,7 @@ export function AdminSettings() {
       if (!isUnlocked) {
         return (
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <div className="flex items-center justify-center gap-2">
                 <Lock className="h-5 w-5" />
                 <CardTitle>Admin Settings</CardTitle>
@@ -156,7 +156,7 @@ export function AdminSettings() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="admin-password">Admin Password</Label>
                   <Input
                     id="admin-password"
@@ -168,7 +168,7 @@ export function AdminSettings() {
                   />
                 </div>
                 <Button onClick={handleUnlock} className="w-full">
-                  <Unlock className="h-4 w-4 mr-2" />
+                  <Unlock className="h-4 w-4" />
                   Unlock Settings
                 </Button>
               </div>
@@ -179,7 +179,7 @@ export function AdminSettings() {
     
       return (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 mx-auto">
                 <Settings className="h-5 w-5" />
@@ -191,38 +191,38 @@ export function AdminSettings() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* App Settings Section */}
-              <div className="space-y-4 border-b pb-6">
-                <div className="space-y-2">
+              <div className="space-y-4 border-b pb-4">
+                <div className="space-y-1">
                   <Label htmlFor="competition-name">Competition Name</Label>
                   <Input id="competition-name" value={competitionName} onChange={(e) => setCompetitionName(e.target.value)} />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="target-points">Target Points (Weekly Fail Threshold)</Label>
                   <Input id="target-points" type="number" value={targetPoints} onChange={(e) => setTargetPoints(e.target.value)} />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="prize-pool-adjustment">Prize Pool Adjustment</Label>
                   <Input id="prize-pool-adjustment" type="number" value={prizePoolAdjustment} onChange={(e) => setPrizePoolAdjustment(e.target.value)} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label htmlFor="z1">Z1</Label><Input id="z1" type="number" value={z1} onChange={(e) => setZ1(e.target.value)} /></div>
-                  <div className="space-y-2"><Label htmlFor="z2">Z2</Label><Input id="z2" type="number" value={z2} onChange={(e) => setZ2(e.target.value)} /></div>
-                  <div className="space-y-2"><Label htmlFor="z3">Z3</Label><Input id="z3" type="number" value={z3} onChange={(e) => setZ3(e.target.value)} /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="space-y-1"><Label htmlFor="z1">Z1</Label><Input id="z1" type="number" value={z1} onChange={(e) => setZ1(e.target.value)} /></div>
+                  <div className="space-y-1"><Label htmlFor="z2">Z2</Label><Input id="z2" type="number" value={z2} onChange={(e) => setZ2(e.target.value)} /></div>
+                  <div className="space-y-1"><Label htmlFor="z3">Z3</Label><Input id="z3" type="number" value={z3} onChange={(e) => setZ3(e.target.value)} /></div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label htmlFor="start-date">Start Date</Label><Input id="start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
-                  <div className="space-y-2"><Label htmlFor="end-date">End Date</Label><Input id="end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1"><Label htmlFor="start-date">Start Date</Label><Input id="start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+                  <div className="space-y-1"><Label htmlFor="end-date">End Date</Label><Input id="end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
                 </div>
               </div>
     
               {/* User Alias Section */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">User Aliases</h3>
-                <div className="space-y-2">
+                <h3 className="text-lg font-medium mb-2">User Aliases</h3>
+                <div className="space-y-1">
                   {users.map((user) => (
-                    <div key={user.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                    <div key={user.id} className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
                       <Label>{user.id}</Label>
                       <Input
                         value={user.display_name || ''}
@@ -235,7 +235,7 @@ export function AdminSettings() {
               </div>
     
               <Button onClick={handleSave} disabled={isLoading} className="w-full">
-                {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save All Settings
               </Button>
             </div>

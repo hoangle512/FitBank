@@ -16,13 +16,13 @@ export function CompetitionOverview() {
   return (
     <div className="mx-auto max-w-sm"> {/* Centering the Competition Ends Card */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-center pb-2">
+        <CardHeader className="flex flex-row items-center justify-center">
           <CardTitle className="text-sm font-medium text-muted-foreground">Competition Ends</CardTitle>
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="text-center"> {/* Centering the text */}
           <div className="text-2xl font-bold">{competitionEndDate}</div>
-          <p className="text-xs text-muted-foreground mt-1">Final submission date</p>
+          <p className="text-xs text-muted-foreground">Final submission date</p>
         </CardContent>
       </Card>
     </div>

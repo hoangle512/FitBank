@@ -8,11 +8,10 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">FitBank Dashboard</h1>
-              <p className="text-muted-foreground mt-1">Real-time heart rate competition tracking</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
@@ -22,14 +21,14 @@ export default function Page() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <PrizePoolCard /> {/* Place PrizePoolCard at the top */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="space-y-6">
           <Leaderboard />
+          <PrizePoolCard />
 
           <CompetitionOverview />
 
-          <div className="grid gap-8 grid-cols-1">
+          <div className="grid gap-6 grid-cols-1">
             <CompetitionRules />
             <AdminSettings />
           </div>

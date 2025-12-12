@@ -33,17 +33,17 @@ export function CompetitionRules() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-center gap-2">
           <Info className="h-5 w-5" />
           <CardTitle>Competition Rules</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-2">
           <div>
-            <h4 className="font-semibold text-foreground mb-1">1. Scoring</h4>
-            <p className="mb-2">
+            <h4 className="font-semibold text-foreground">1. Scoring</h4>
+            <p className="mb-1">
               Points are awarded based on heart rate readings. Consistent monitoring and achieving target zones will earn you more points: 
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
@@ -64,26 +64,26 @@ export function CompetitionRules() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">2. Step Points</h4>
+            <h4 className="font-semibold text-foreground">2. Step Points</h4>
             <p>
               Users also collect points based on steps. For every 200 steps, 1 point is received. Both points and steps are rounded down.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">3. Fails</h4>
+            <h4 className="font-semibold text-foreground">3. Fails</h4>
             <p>
               <strong>{settings?.target_points ?? "..."} Points</strong> - If a participant fails to collect the minimum
               number of target points for the week, 1000czk goes into the bank.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">3. Winner Selection</h4>
+            <h4 className="font-semibold text-foreground">3. Winner Selection</h4>
             <p>
               The winner is determined by the highest total points at the end of each week and receives a coin. Coins can be used to pay for your fails.
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-1">4. Prize Distribution</h4>
+            <h4 className="font-semibold text-foreground">4. Prize Distribution</h4>
             <p>
               Prize pool will be spent on a social event at the end of the Competition.
             </p>
