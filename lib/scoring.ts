@@ -15,6 +15,6 @@ export function calculatePointsForBpm(
   } else if (bpm >= z1) {
     return 1;
   } else {
-    return 0; // BPM below 125 get 0 points
+    return 0; // BPM below z1 get 0 points
   }
 }

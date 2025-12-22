@@ -21,7 +21,7 @@ export async function GET() {
   const defaultSettings = {
     competition_name: "FitBank Challenge 2024",
     target_points: "500",
-    z1: "125", // Default values based on GEMINI.md
+    z1: "125",
     z2: "150",
     z3: "165",
     start_date: new Date().toISOString().split('T')[0], // Today's date
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
 
-  
+
 
   try {
 
@@ -89,9 +89,9 @@ export async function POST(request: Request) {
 
     // 2. Recalculate stats using the new threshold
 
-    const { error: rpcError } = await supabase.rpc('calculate_weekly_stats', { 
+    const { error: rpcError } = await supabase.rpc('calculate_weekly_stats', {
 
-      fail_threshold: target_points 
+      fail_threshold: target_points
 
     });
 

@@ -27,8 +27,10 @@ const mockHeartRateOrder = jest.fn(() => Promise.resolve({ data: [], error: null
 const mockHeartRateIn = jest.fn(() => ({
   order: mockHeartRateOrder,
 }));
+const mockHeartRateGte = jest.fn(() => Promise.resolve({ data: [], error: null })); // Default return
 const mockHeartRateSelect = jest.fn(() => ({
   in: mockHeartRateIn,
+  gte: mockHeartRateGte, // Add gte support
 }));
 
 // Mocks for steps_data
@@ -51,7 +53,7 @@ const mockSupabaseFrom = jest.fn((tableName) => {
   } else if (tableName === 'users') {
     return {
       upsert: mockUpsert,
-      select: jest.fn(() => Promise.resolve({ data: [{ id: 'dominika', display_name: 'dominika' }], error: null })),
+      select: jest.fn(() => Promise.resolve({ data: [{ id: 'dominika', username: 'dominika', display_name: 'Dominika Display' }], error: null })),
     };
   } else if (tableName === 'leaderboard_stats') {
     return {
@@ -64,11 +66,13 @@ const mockSupabaseFrom = jest.fn((tableName) => {
 const mockSupabaseRpc = jest.fn((rpcName, ..._args) => {
   void _args; // Renamed params to _params to mark as unused
   if (rpcName === 'get_app_settings') {
-    return Promise.resolve({ data: [
-      { key: 'z1', value: '125' },
-      { key: 'z2', value: '150' },
-      { key: 'z3', value: '165' },
-    ], error: null });
+    return Promise.resolve({
+      data: [
+        { key: 'z1', value: '125' },
+        { key: 'z2', value: '150' },
+        { key: 'z3', value: '165' },
+      ], error: null
+    });
   }
   if (rpcName === 'calculate_weekly_stats') {
     return Promise.resolve({ data: {}, error: null });
@@ -100,6 +104,8 @@ describe('Leaderboard API with custom data', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2025-12-02T12:00:00Z')); // Tuesday
     // Store original environment variables
     originalEnv = process.env;
     // Set mock environment variables for Supabase URL and Key
@@ -111,6 +117,7 @@ describe('Leaderboard API with custom data', () => {
   });
 
   afterAll(() => {
+    jest.useRealTimers();
     // Restore original environment variables
     process.env = originalEnv;
   });
@@ -136,52 +143,52 @@ describe('Leaderboard API with custom data', () => {
     const dominikaData = [
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:37:00+01:00", // BPM 115 (0 points)
+        "timestamp": "2025-12-02T21:37:00+01:00", // BPM 115 (0 points)
         "bpm": 115
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:37:08+01:00", // BPM 118 (0 points)
+        "timestamp": "2025-12-02T21:37:08+01:00", // BPM 118 (0 points)
         "bpm": 118
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:37:19+01:00", // BPM 121 (0 points)
+        "timestamp": "2025-12-02T21:37:19+01:00", // BPM 121 (0 points)
         "bpm": 121
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:37:28+01:00", // BPM 122 (0 points)
+        "timestamp": "2025-12-02T21:37:28+01:00", // BPM 122 (0 points)
         "bpm": 122
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:50:23+01:00", // BPM 128 (1 point)
+        "timestamp": "2025-12-02T21:50:23+01:00", // BPM 128 (1 point)
         "bpm": 128
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:50:27+01:00", // BPM 129 (1 point)
+        "timestamp": "2025-12-02T21:50:27+01:00", // BPM 129 (1 point)
         "bpm": 129
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:50:31+01:00", // BPM 128 (1 point)
+        "timestamp": "2025-12-02T21:50:31+01:00", // BPM 128 (1 point)
         "bpm": 128
       },
       {
         "username": "dominika",
-        "timestamp": "2025-11-30T21:50:37+01:00", // BPM 127 (1 point)
+        "timestamp": "2025-12-02T21:50:37+01:00", // BPM 127 (1 point)
         "bpm": 127
       },
       {
         "username": "dominika",
-        "timestamp": "2025-12-01T08:53:55+01:00", // BPM 151 (2 points)
+        "timestamp": "2025-12-02T08:53:55+01:00", // BPM 151 (2 points)
         "bpm": 151
       },
       {
         "username": "dominika",
-        "timestamp": "2025-12-01T16:42:40+01:00", // BPM 141 (1 point)
+        "timestamp": "2025-12-02T16:42:40+01:00", // BPM 141 (1 point)
         "bpm": 141
       }
     ];
@@ -220,10 +227,10 @@ describe('Leaderboard API with custom data', () => {
     // After processing heart rate data, now query the leaderboard
     // Mock the heart_rate_data that the leaderboard API will fetch
     const processedHeartRateData = dominikaData.map(d => ({
-        username: d.username,
-        points: calculatePointsForBpm(d.bpm, 125, 150, 165), // Calculate points based on default thresholds
-        bpm: d.bpm,
-        timestamp: d.timestamp,
+      username: d.username,
+      points: calculatePointsForBpm(d.bpm, 125, 150, 165), // Calculate points based on default thresholds
+      bpm: d.bpm,
+      timestamp: d.timestamp,
     }));
 
     // Filter for entries that yielded at least 1 point for the minutes calculation in leaderboard
@@ -231,34 +238,40 @@ describe('Leaderboard API with custom data', () => {
 
     // Sample steps data for Dominika
     const dominikaStepsData = [
-      { username: 'dominika', steps: 1000, timestamp: '2025-12-01T09:00:00+01:00' }, // 1000 * 0.005 = 5 points
-      { username: 'dominika', steps: 1500, timestamp: '2025-12-01T10:00:00+01:00' }, // 1500 * 0.005 = 7.5, rounded to 7 points
+      { username: 'dominika', steps: 1000, timestamp: '2025-12-02T09:00:00+01:00' }, // 1000 * 0.005 = 5 points
+      { username: 'dominika', steps: 1500, timestamp: '2025-12-02T10:00:00+01:00' }, // 1500 * 0.005 = 7.5, rounded to 7 points
     ];
     const expectedTotalStepsWeekly = dominikaStepsData.reduce((sum, entry) => sum + entry.steps, 0); // 2500
     const expectedStepsPoints = dominikaStepsData.reduce((sum, entry) => sum + Math.floor(entry.steps * 0.005), 0); // 5 + 7 = 12
 
     // Mock RPCs for leaderboardGET
-    mockSupabaseRpc.mockImplementationOnce((rpcName) => {
+    mockSupabaseRpc.mockImplementation((rpcName) => {
       if (rpcName === 'get_app_settings') {
-        return Promise.resolve({ data: [
-          { key: 'z1', value: '125' },
-          { key: 'z2', value: '150' },
-          { key: 'z3', value: '165' },
-        ], error: null });
+        return Promise.resolve({
+          data: [
+            { key: 'z1', value: '125' },
+            { key: 'z2', value: '150' },
+            { key: 'z3', value: '165' },
+          ], error: null
+        });
       }
-      if (rpcName === 'get_heart_rate_data_all') {
-        return Promise.resolve({ data: processedHeartRateData, error: null });
-      }
+      // get_heart_rate_data_all is no longer used, we mock gte directly below
       if (rpcName === 'get_steps_data_weekly') { // Mock steps data for RPC
         return Promise.resolve({ data: dominikaStepsData, error: null });
       }
       return Promise.resolve({ data: {}, error: null });
     });
 
+    // Mock direct DB select for heart_rate_data
+    mockHeartRateGte.mockResolvedValue({ data: processedHeartRateData, error: null });
+
     const leaderboardResponse = await leaderboardGET();
     const leaderboardBody = await leaderboardResponse.json();
 
-    const dominikaEntry = leaderboardBody.leaderboard.find((entry: LeaderboardEntry) => entry.username === 'dominika');
+    const dominikaEntry = leaderboardBody.leaderboard.find((entry: LeaderboardEntry) => entry.id === 'dominika');
+
+    expect(dominikaEntry).toBeDefined();
+    expect(dominikaEntry.username).toBe('Dominika Display');
 
     // Expected minutes: count of entries with points >= 1
     const expectedMinutes = pointEarningEntries.length; // 6 entries earn points
